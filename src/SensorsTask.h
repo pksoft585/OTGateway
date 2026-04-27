@@ -128,6 +128,9 @@ protected:
       pollingDallasSensors();
       this->yield();
 
+      pollingAhtSensors();
+      this->yield();
+
       pollingNtcSensors();
       this->yield();
 
@@ -398,6 +401,33 @@ protected:
       }
     }
   }
+
+#if defined(USE_AHT20)
+  void pollingAhtSensors() {
+    for (uint8_t sensorId = 0; sensorId <= Sensors::getMaxSensorId(); sensorId++) {
+      auto& sSensor = Sensors::settings[sensorId];
+      
+      if (!sSensor.enabled || sSensor.type != Sensors::Type::AHT20 || sSensor.purpose == Sensors::Purpose::NOT_CONFIGURED) {
+        aht20Sensor.read = false;
+        continue;
+      }
+
+      aht20Sensor.read = true;
+
+      Log.straceln(
+        FPSTR(L_SENSORS_AHT20), F("Sensor AHT20 '%s', temp: %.2f, humidity: %.2f%%"),
+        sSensor.name, aht20Sensor.temperature, aht20Sensor.humidity
+      );
+
+      // set temp
+      Sensors::setValueById(sensorId, aht20Sensor.temperature, Sensors::ValueType::TEMPERATURE, true, true);
+      // set humidity
+      Sensors::setValueById(sensorId, aht20Sensor.humidity, Sensors::ValueType::HUMIDITY, true, true);
+
+      break;
+    }
+  }
+#endif
 
   void pollingNtcSensors() {
     for (uint8_t sensorId = 0; sensorId <= Sensors::getMaxSensorId(); sensorId++) {

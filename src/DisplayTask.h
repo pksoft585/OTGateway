@@ -3,7 +3,9 @@
 #include <Arduino_GFX_Library.h>
 #include <TAMC_GT911.h>
 #include <Wire.h>
-#include <Adafruit_AHTX0.h>
+#if defined(USE_AHT20)
+  #include <Adafruit_AHTX0.h>
+#endif  
 
 LV_FONT_DECLARE(mdi_24);
 
@@ -87,11 +89,6 @@ const char* displayInitResultToString(DisplayInitResult r)
 // AHT20 sensor
 #if defined(USE_AHT20)
   Adafruit_AHTX0            aht;
-
-  float    aht_temperature = 0.0f;
-  float    aht_humidity = 0.0f;
-  int      aht_period = 10000;
-  uint32_t aht_last_read = 0;
 #endif
 
 // Global display objects
@@ -149,26 +146,11 @@ void updateDashboardUI();
 #if defined(USE_AHT20)
 // AHT20 Sensor update
 void update_aht20() {
-  sensors_event_t humidity, temp;
-
-  for (uint8_t sensorId = 0; sensorId <= Sensors::getMaxSensorId(); sensorId++) {
-    auto& sSensor = Sensors::settings[sensorId];
-      
-    if (!sSensor.enabled || sSensor.type != Sensors::Type::AHT20 || sSensor.purpose == Sensors::Purpose::NOT_CONFIGURED) {
-    } else {
-        if (aht.getEvent(&humidity, &temp)) {
-          aht_temperature = temp.temperature;
-          aht_humidity = humidity.relative_humidity;
-          // AHT20 Sensor publishing
-          Log.straceln(
-              FPSTR(L_SENSORS_AHT20), F("Sensor AHT20 '%s', temp: %.2f, humidity: %.2f%%"),
-              sSensor.name, aht_temperature, aht_humidity
-          );
-          Sensors::setValueById(sensorId, aht_temperature, Sensors::ValueType::TEMPERATURE, true, true);
-          Sensors::setValueById(sensorId, aht_humidity, Sensors::ValueType::HUMIDITY, true, true);
-        }
+    sensors_event_t humidity, temp;
+    if (aht.getEvent(&humidity, &temp)) {
+        aht20Sensor.temperature = temp.temperature;
+        aht20Sensor.humidity = humidity.relative_humidity;
     }
-  }
 }  
 #endif
 
@@ -617,9 +599,11 @@ void display_loop() {
     last_touch = current_touch;
 
 #if defined(USE_AHT20)
-    if ((millis() - aht_last_read) > aht_period) {
-        aht_last_read = millis();
-        update_aht20();
+    if (aht20Sensor.read) {
+        if ((millis() - aht20Sensor.last_read) > aht20Sensor.period) {
+            aht20Sensor.last_read = millis();
+            update_aht20();
+        }
     }
 #endif
 
@@ -643,6 +627,10 @@ public:
 private:
     void setup() override {}
     void loop() override {
+        if (vars.states.restarting || vars.states.upgrading) {
+          return;
+        }
+
         display_loop();
     }
 };

@@ -34,6 +34,11 @@
 #include "PortalTask.h"
 #include "MainTask.h"
 
+// Display Include
+#if defined(DISPLAY_ENABLED)
+  #include "DisplayTask.h"
+#endif
+
 using namespace NetworkUtils;
 
 // Vars
@@ -52,6 +57,11 @@ SensorsTask* tSensors;
 RegulatorTask* tRegulator;
 PortalTask* tPortal;
 MainTask* tMain;
+
+// Display Task Instance
+#if defined(DISPLAY_ENABLED)
+  DisplayTask* tDisplay = nullptr;
+#endif
 
 
 void setup() {
@@ -81,6 +91,12 @@ void setup() {
   #endif
   Log.addStream(&Serial);
   Log.print("\n\n\r");
+
+  //
+  // Display Init
+#if defined(DISPLAY_ENABLED)
+  auto display_init_result = display_init();
+#endif
 
   //
   // Network settings
@@ -222,6 +238,17 @@ void setup() {
   tMain = new MainTask(true, 100);
   Scheduler.start(tMain);
 
+  // Display Task
+  #if defined(DISPLAY_ENABLED)
+    if (display_init_result == DisplayInitResult::OK) {
+      Log.sinfoln(FPSTR(L_DISPLAY), F("Display task ready to start"));
+      tDisplay = new DisplayTask(true, 10);
+      Scheduler.start(tDisplay);
+    } else {
+      Log.serrorln(FPSTR(L_DISPLAY), "Display initialization failed, reason = %u", displayInitResultToString(display_init_result));
+    }
+  #endif
+  
   Scheduler.begin();
 }
 

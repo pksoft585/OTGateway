@@ -176,9 +176,14 @@ public:
       objId.c_str()
     );
 
-    // set device class, name, value template for bluetooth sensors
+    // set device class, name, value template for sensors
     // or name & value template for another sensors
+#if defined(USE_AHT20)
+    if (sSensor.type == Sensors::Type::BLUETOOTH ||
+        sSensor.type == Sensors::Type::AHT20) {
+#else
     if (sSensor.type == Sensors::Type::BLUETOOTH) {
+#endif
       // available state topic
       doc[FPSTR(HA_AVAILABILITY)][1][FPSTR(HA_TOPIC)] = doc[FPSTR(HA_STATE_TOPIC)];
       doc[FPSTR(HA_AVAILABILITY)][1][FPSTR(HA_VALUE_TEMPLATE)] = JsonString(AVAILABILITY_SENSOR_CONN, true);

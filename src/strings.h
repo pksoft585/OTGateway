@@ -24,6 +24,9 @@ const char L_OT_CH2[]                               PROGMEM = "OT.CH2";
 const char L_SENSORS[]                              PROGMEM = "SENSORS";
 const char L_SENSORS_SETTINGS[]                     PROGMEM = "SENSORS.SETTINGS";
 const char L_SENSORS_DALLAS[]                       PROGMEM = "SENSORS.DALLAS";
+#if defined(USE_AHT20)
+const char L_SENSORS_AHT20[]                        PROGMEM = "SENSORS.AHT20";
+#endif
 const char L_SENSORS_NTC[]                          PROGMEM = "SENSORS.NTC";
 const char L_SENSORS_BLE[]                          PROGMEM = "SENSORS.BLE";
 const char L_REGULATOR[]                            PROGMEM = "REGULATOR";

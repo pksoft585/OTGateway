@@ -248,6 +248,7 @@
         "ntcTemp": "NTC датчик",
         "dallasTemp": "DALLAS датчик",
         "bluetooth": "BLE датчик",
+        "aht20": "AHT20 датчик",
         "heatSetpointTemp": "Отопление, температура уставки",
         "manual": "Вручную через MQTT/API",
         "notConfigured": "Не сконфигурировано"

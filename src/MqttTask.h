@@ -292,7 +292,16 @@ protected:
               this->haHelper->deleteDynamicSensor(prevSettings, Sensors::ValueType::RSSI);
               break;
 
-            case Sensors::Type::DALLAS_TEMP:
+#if defined(USE_AHT20)
+              case Sensors::Type::AHT20:
+              this->haHelper->deleteConnectionDynamicSensor(prevSettings);
+              this->haHelper->deleteSignalQualityDynamicSensor(prevSettings);
+              this->haHelper->deleteDynamicSensor(prevSettings, Sensors::ValueType::TEMPERATURE);
+              this->haHelper->deleteDynamicSensor(prevSettings, Sensors::ValueType::HUMIDITY);
+              break;
+#endif
+
+              case Sensors::Type::DALLAS_TEMP:
               this->haHelper->deleteConnectionDynamicSensor(prevSettings);
               this->haHelper->deleteSignalQualityDynamicSensor(prevSettings);
               this->haHelper->deleteDynamicSensor(prevSettings, Sensors::ValueType::TEMPERATURE);
@@ -318,6 +327,15 @@ protected:
             this->haHelper->publishDynamicSensor(sSettings, Sensors::ValueType::BATTERY, settings.system.unitSystem);
             this->haHelper->publishDynamicSensor(sSettings, Sensors::ValueType::RSSI, settings.system.unitSystem, false);
             break;
+
+#if defined(USE_AHT20)
+          case Sensors::Type::AHT20:
+            this->haHelper->publishConnectionDynamicSensor(sSettings);
+            this->haHelper->publishSignalQualityDynamicSensor(sSettings, false);
+            this->haHelper->publishDynamicSensor(sSettings, Sensors::ValueType::TEMPERATURE, settings.system.unitSystem);
+            this->haHelper->publishDynamicSensor(sSettings, Sensors::ValueType::HUMIDITY, settings.system.unitSystem);
+            break;
+#endif
 
           case Sensors::Type::DALLAS_TEMP:
             this->haHelper->publishConnectionDynamicSensor(sSettings);

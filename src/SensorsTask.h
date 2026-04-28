@@ -408,21 +408,29 @@ protected:
       auto& sSensor = Sensors::settings[sensorId];
       
       if (!sSensor.enabled || sSensor.type != Sensors::Type::AHT20 || sSensor.purpose == Sensors::Purpose::NOT_CONFIGURED) {
-        aht20Sensor.read = false;
+        SensorAHT20.read = false;
+        continue;
+      }
+      if (!SensorAHT20.found) {
+        SensorAHT20.read = false;
+        Log.swarningln(
+          FPSTR(L_SENSORS_AHT20), F("Sensor AHT20 '%s': not initialized"),
+          sSensor.name
+        );
         continue;
       }
 
-      aht20Sensor.read = true;
+      SensorAHT20.read = true;
 
       Log.straceln(
         FPSTR(L_SENSORS_AHT20), F("Sensor AHT20 '%s', temp: %.2f, humidity: %.2f%%"),
-        sSensor.name, aht20Sensor.temperature, aht20Sensor.humidity
+        sSensor.name, SensorAHT20.temperature, SensorAHT20.humidity
       );
 
       // set temp
-      Sensors::setValueById(sensorId, aht20Sensor.temperature, Sensors::ValueType::TEMPERATURE, true, true);
+      Sensors::setValueById(sensorId, SensorAHT20.temperature, Sensors::ValueType::TEMPERATURE, true, true);
       // set humidity
-      Sensors::setValueById(sensorId, aht20Sensor.humidity, Sensors::ValueType::HUMIDITY, true, true);
+      Sensors::setValueById(sensorId, SensorAHT20.humidity, Sensors::ValueType::HUMIDITY, true, true);
 
       break;
     }

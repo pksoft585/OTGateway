@@ -45,6 +45,13 @@ struct Settings {
     uint8_t statusLedGpio = DEFAULT_STATUS_LED_GPIO;
   } system;
 
+#if defined(DISPLAY_ENABLED)
+    struct {
+      bool enabled = false;
+      uint32_t timeout_ms = 30000; 
+    } display;
+#endif
+
   struct {
     bool auth = false;
     char login[13] = DEFAULT_PORTAL_LOGIN;

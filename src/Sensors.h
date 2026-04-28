@@ -476,19 +476,21 @@ public:
 // AHT20 sensor
 #if defined(USE_AHT20)
 typedef struct {
-  float temperature;
-  float humidity;
-  int period;
-  uint32_t last_read;
-  bool read;
-} SensorAHT20;
+    float temperature;
+    float humidity;
+    int period;
+    uint32_t last_read;
+    bool read;
+    bool found;
+} SensorAHTX;
 
-  SensorAHT20 aht20Sensor = {
+  SensorAHTX SensorAHT20 = {
     .temperature = 0.0f,
     .humidity = 0.0f,
     .period = 10000,
     .last_read = 0,
-    .read = false
+    .read = false,
+    .found = false
   };
 #endif
 

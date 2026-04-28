@@ -88,7 +88,7 @@ const char* displayInitResultToString(DisplayInitResult r)
 
 // AHT20 sensor
 #if defined(USE_AHT20)
-  Adafruit_AHTX0            aht;
+  Adafruit_AHTX0         aht20;
 #endif
 
 // Global display objects
@@ -97,17 +97,8 @@ Arduino_ESP32RGBPanel    *rgbpanel      = nullptr;
 Arduino_RGB_Display      *gfx           = nullptr;
 TAMC_GT911               *gt911         = nullptr;
 lv_display_t             *lv_display    = nullptr;
-lv_color_t               *lv_buf        = nullptr;
-  
-// Touch state
-int16_t touch_x = 0;
-int16_t touch_y = 0;
-bool    touch_pressed = false;
-
-// Display state
-bool     display_on = true;
-int      display_timeout = 30;
-uint32_t display_last_touch = 0;
+static lv_color_t        *lv_buf1       = nullptr;
+static lv_color_t        *lv_buf2       = nullptr;
 
 // LGVL Tick timer
 esp_timer_handle_t lvgl_tick_timer = nullptr;
@@ -137,6 +128,34 @@ struct {
     lv_obj_t *dhw_time = nullptr;
 } ui;
 
+//Last values for display update optimization
+struct {
+    float heating_target = 0.0f;
+    float heating_currentTemp = 0.0f;
+    bool  heating_enabled = false;
+    bool  heating_turbo = false;
+    bool  heating_active = false;
+    float dhw_target = 0.0f;
+    float dhw_currentTemp = 0.0f;
+    bool  dhw_enabled = false;
+    bool  dhw_active = false;
+    int   last_minute = -1;
+    bool  flame = false;
+    bool  wifi = false;
+} LastVals;
+
+struct {
+    int16_t x = 0;
+    int16_t y = 0;
+    bool    pressed = false;
+    bool    last_state = false; 
+} touch;
+
+struct {
+    bool     on = true;
+    uint32_t last_touch = 0;
+} display;
+
 // Forward declarations
 void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
 void my_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data);
@@ -144,12 +163,12 @@ void createDashboardUI();
 void updateDashboardUI();
 
 #if defined(USE_AHT20)
-// AHT20 Sensor update
+// AHT20 sensor update
 void update_aht20() {
     sensors_event_t humidity, temp;
-    if (aht.getEvent(&humidity, &temp)) {
-        aht20Sensor.temperature = temp.temperature;
-        aht20Sensor.humidity = humidity.relative_humidity;
+    if (aht20.getEvent(&humidity, &temp)) {
+        SensorAHT20.temperature = temp.temperature;
+        SensorAHT20.humidity = humidity.relative_humidity;
     }
 }  
 #endif
@@ -192,16 +211,17 @@ static void dhw_enable_cb(lv_event_t *e) {
 
 // Display functions
 void displayOn() {
-  display_on = true;
-  pinMode(DISP_BACKLIGHT, OUTPUT);
-  digitalWrite(DISP_BACKLIGHT, HIGH);
-  display_last_touch = millis();
+    lv_display_flush_ready(lv_display);
+    display.on = true;
+    pinMode(DISP_BACKLIGHT, OUTPUT);
+    digitalWrite(DISP_BACKLIGHT, HIGH);
+    display.last_touch = millis();
 }
     
 void displayOff() {
-  display_on = false;
-  pinMode(DISP_BACKLIGHT, OUTPUT);
-  digitalWrite(DISP_BACKLIGHT, LOW);
+    display.on = false;
+    pinMode(DISP_BACKLIGHT, OUTPUT);
+    digitalWrite(DISP_BACKLIGHT, LOW);
 }
 
 // Display initialization
@@ -219,7 +239,7 @@ DisplayInitResult display_init()
     1 /* vsync_polarity */, 20 /* v_front */, 10 /* v_pulse */, 40 /* vsync_back_porch */,
     1 /* pclk_active_neg */, 10000000L /* 10MHz */,
     false /* bounce_buffer */);
-  if (!rgbpanel) return DisplayInitResult::RGB_FAIL;
+    if (!rgbpanel) return DisplayInitResult::RGB_FAIL;
 
   gfx = new Arduino_RGB_Display(
     DISP_WIDTH, DISP_HEIGHT, rgbpanel, 0, true,
@@ -229,6 +249,7 @@ DisplayInitResult display_init()
   if (!gfx->begin()) return DisplayInitResult::GFX_BEGIN_FAIL;
 
   Wire.begin(TOUCH_SDA, TOUCH_SCL);
+  Wire.setClock(400000);
 
   gt911 = new TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, DISP_WIDTH, DISP_HEIGHT);
   if (!gt911) return DisplayInitResult::TOUCH_FAIL;
@@ -238,21 +259,27 @@ DisplayInitResult display_init()
 
   lv_init();
 
-  uint32_t buf_pixels = DISP_WIDTH * DISP_HEIGHT;
-  size_t buf_size = buf_pixels * sizeof(lv_color_t);
+  size_t buf_size = (DISP_WIDTH * DISP_HEIGHT) * sizeof(lv_color_t);
 
-  lv_buf = (lv_color_t *)heap_caps_malloc(buf_pixels * sizeof(lv_color_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-  if (!lv_buf) {
-    Log.swarningln(FPSTR(L_DISPLAY), F("PSRAM buffer failed, trying INTERNAL"));
-    lv_buf = (lv_color_t *)heap_caps_malloc(buf_pixels * sizeof(lv_color_t), MALLOC_CAP_INTERNAL);
+  lv_buf1 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  lv_buf2 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (lv_buf1 == nullptr || lv_buf2 == nullptr) {
+    if (lv_buf1) free(lv_buf1);
+    if (lv_buf2) free(lv_buf2);
+    lv_buf1 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    lv_buf2 = nullptr;
   }
-  if (!lv_buf) return DisplayInitResult::LV_BUF_FAIL;
+  if (!lv_buf1) return DisplayInitResult::LV_BUF_FAIL;
 
   lv_display = lv_display_create(DISP_WIDTH, DISP_HEIGHT);
   if (!lv_display) return DisplayInitResult::LV_DISPLAY_FAIL;
 
   lv_display_set_flush_cb(lv_display, my_disp_flush);
-  lv_display_set_buffers(lv_display, lv_buf, nullptr, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+  if (lv_buf2 != nullptr) {
+    lv_display_set_buffers(lv_display, lv_buf1, lv_buf2, buf_size, LV_DISPLAY_RENDER_MODE_FULL);
+  } else {
+    lv_display_set_buffers(lv_display, lv_buf1, nullptr, buf_size, LV_DISPLAY_RENDER_MODE_FULL);
+  }
   lv_display_set_default(lv_display);
 
   lv_indev_t *indev = lv_indev_create();
@@ -273,8 +300,10 @@ DisplayInitResult display_init()
   esp_timer_start_periodic(lvgl_tick_timer, 5000);
 
 #if defined(USE_AHT20)
-  if (!aht.begin()) {
+  if (!aht20.begin()) {
     Log.swarningln(FPSTR(L_DISPLAY), F("AHT20 sensor not found!"));
+  } else {
+    SensorAHT20.found = true;
   }
 #endif
 
@@ -287,16 +316,16 @@ DisplayInitResult display_init()
 
 // Display callbacks
 void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
-  uint32_t w = area->x2 - area->x1 + 1;
-  uint32_t h = area->y2 - area->y1 + 1;
-  gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t *)px_map, w, h);
-  lv_display_flush_ready(disp);
+    uint32_t w = area->x2 - area->x1 + 1;
+    uint32_t h = area->y2 - area->y1 + 1;
+    gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t *)px_map, w, h);
+    lv_display_flush_ready(disp);
 }
 
 void my_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
-  data->point.x = touch_x;
-  data->point.y = touch_y;
-  data->state = touch_pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+    data->point.x = touch.x;
+    data->point.y = touch.y;
+    data->state = touch.pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
 }
 
 // UI Creation
@@ -503,67 +532,103 @@ void createDashboardUI() {
 void updateDashboardUI() {
     // Update heating section
     if (ui.heat_setpoint) {
-        int t10 = (int)(settings.heating.target * 10.0f);
-        lv_label_set_text_fmt(ui.heat_setpoint, "%d.%d °C", t10 / 10, abs(t10 % 10));
+        if (fabs(LastVals.heating_target - settings.heating.target) > 0.1f) {
+            LastVals.heating_target = settings.heating.target;
+            int t10 = (int)(LastVals.heating_target * 10.0f);
+            lv_label_set_text_fmt(ui.heat_setpoint, "%d.%d °C", t10 / 10, abs(t10 % 10));
+        }
     }
     
     if (ui.heat_current) {
-        int t10 = (int)(vars.slave.heating.currentTemp * 10.0f);
-        lv_label_set_text_fmt(ui.heat_current, "Current: %d.%d °C", t10 / 10, abs(t10 % 10));
-    }
-
-    if (ui.heat_sw_enable) {
-        if (settings.heating.enabled) lv_obj_add_state(ui.heat_sw_enable, LV_STATE_CHECKED);
-        else lv_obj_clear_state(ui.heat_sw_enable, LV_STATE_CHECKED);
-    }
-
-    if (ui.heat_sw_turbo) {
-        if (settings.heating.turbo) lv_obj_add_state(ui.heat_sw_turbo, LV_STATE_CHECKED);
-        else lv_obj_clear_state(ui.heat_sw_turbo, LV_STATE_CHECKED);
-    }
-
-    if (ui.heat_title) {
-        if (vars.slave.heating.active) {
-            lv_obj_set_style_text_color(ui.heat_title, lv_color_hex(0xC62828), 0);
-        } else {
-            lv_obj_set_style_text_color(ui.heat_title, lv_color_hex(0x0066CC), 0);
+        if (fabs(LastVals.heating_currentTemp - vars.slave.heating.currentTemp) > 0.1f) {
+            LastVals.heating_currentTemp = vars.slave.heating.currentTemp;
+            int t10 = (int)(LastVals.heating_currentTemp * 10.0f);
+            lv_label_set_text_fmt(ui.heat_current, "Current: %d.%d °C", t10 / 10, abs(t10 % 10));
         }
     }
 
-    if (vars.slave.flame) {
-        lv_obj_clear_flag(ui.heat_flame_icon, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(ui.heat_flame_icon, LV_OBJ_FLAG_HIDDEN);
+    if (ui.heat_sw_enable) {
+        if (LastVals.heating_enabled != settings.heating.enabled) {
+            LastVals.heating_enabled = settings.heating.enabled;
+            if (LastVals.heating_enabled) lv_obj_add_state(ui.heat_sw_enable, LV_STATE_CHECKED);
+            else lv_obj_clear_state(ui.heat_sw_enable, LV_STATE_CHECKED);
+        }
+    }
+
+    if (ui.heat_sw_turbo) {
+        if (LastVals.heating_turbo != settings.heating.turbo) {
+            LastVals.heating_turbo = settings.heating.turbo;
+            if (LastVals.heating_turbo) lv_obj_add_state(ui.heat_sw_turbo, LV_STATE_CHECKED);
+            else lv_obj_clear_state(ui.heat_sw_turbo, LV_STATE_CHECKED);
+        }
+    }
+
+    if (ui.heat_title) {
+        if (LastVals.heating_active != vars.slave.heating.active) {
+            LastVals.heating_active = vars.slave.heating.active;
+            if (vars.slave.heating.active) {
+                lv_obj_set_style_text_color(ui.heat_title, lv_color_hex(0xC62828), 0);
+            } else {
+                lv_obj_set_style_text_color(ui.heat_title, lv_color_hex(0x0066CC), 0);
+            }
+        }
+    }
+
+    if (ui.heat_flame_icon) {
+        if (LastVals.flame != vars.slave.flame) {
+            LastVals.flame = vars.slave.flame;
+            if (LastVals.flame) {
+                lv_obj_clear_flag(ui.heat_flame_icon, LV_OBJ_FLAG_HIDDEN);
+            } else {
+                lv_obj_add_flag(ui.heat_flame_icon, LV_OBJ_FLAG_HIDDEN);
+            }
+        }
     }
 
     if (ui.heat_icon_wifi) {
-        if (vars.network.connected)
-            lv_obj_clear_flag(ui.heat_icon_wifi, LV_OBJ_FLAG_HIDDEN);
-        else
-            lv_obj_add_flag(ui.heat_icon_wifi, LV_OBJ_FLAG_HIDDEN);
+        if (LastVals.wifi != vars.network.connected) {
+            LastVals.wifi = vars.network.connected;
+            if (LastVals.wifi) {
+                lv_obj_clear_flag(ui.heat_icon_wifi, LV_OBJ_FLAG_HIDDEN);
+            } else {
+                lv_obj_add_flag(ui.heat_icon_wifi, LV_OBJ_FLAG_HIDDEN);
+            }
+        }
     }
 
     // Update DHW section
     if (ui.dhw_setpoint) {
-        int t10 = (int)(settings.dhw.target * 10.0f);
-        lv_label_set_text_fmt(ui.dhw_setpoint, "%d.%d °C", t10 / 10, abs(t10 % 10));
+        if (fabs(LastVals.dhw_target - settings.dhw.target) > 0.1f) {
+            LastVals.dhw_target = settings.dhw.target;
+            int t10 = (int)(LastVals.dhw_target * 10.0f);
+            lv_label_set_text_fmt(ui.dhw_setpoint, "%d.%d °C", t10 / 10, abs(t10 % 10));
+        }
     }
     
     if (ui.dhw_current) {
-        int t10 = (int)(vars.slave.dhw.currentTemp * 10.0f);
-        lv_label_set_text_fmt(ui.dhw_current, "Current: %d.%d °C", t10 / 10, abs(t10 % 10));
+        if (fabs(LastVals.dhw_currentTemp - vars.slave.dhw.currentTemp) > 0.1f) {
+            LastVals.dhw_currentTemp = vars.slave.dhw.currentTemp;
+            int t10 = (int)(LastVals.dhw_currentTemp * 10.0f);
+            lv_label_set_text_fmt(ui.dhw_current, "Current: %d.%d °C", t10 / 10, abs(t10 % 10));
+        }
     }
 
     if (ui.dhw_sw_enable) {
-        if (settings.dhw.enabled) lv_obj_add_state(ui.dhw_sw_enable, LV_STATE_CHECKED);
-        else lv_obj_clear_state(ui.dhw_sw_enable, LV_STATE_CHECKED);
+        if (LastVals.dhw_enabled != settings.dhw.enabled) {
+            LastVals.dhw_enabled = settings.dhw.enabled;
+            if (LastVals.dhw_enabled) lv_obj_add_state(ui.dhw_sw_enable, LV_STATE_CHECKED);
+            else lv_obj_clear_state(ui.dhw_sw_enable, LV_STATE_CHECKED);
+        }
     }
 
     if (ui.dhw_title) {
-        if (vars.slave.dhw.active) {
-            lv_obj_set_style_text_color(ui.dhw_title, lv_color_hex(0xC62828), 0);
-        } else {
-            lv_obj_set_style_text_color(ui.dhw_title, lv_color_hex(0x0066CC), 0);
+        if (LastVals.dhw_active != vars.slave.dhw.active) {
+            LastVals.dhw_active = vars.slave.dhw.active;
+            if (vars.slave.dhw.active) {
+                lv_obj_set_style_text_color(ui.dhw_title, lv_color_hex(0xC62828), 0);
+            } else {
+                lv_obj_set_style_text_color(ui.dhw_title, lv_color_hex(0x0066CC), 0);
+            }
         }
     }
 
@@ -572,9 +637,12 @@ void updateDashboardUI() {
         if (now > 100000) {
             struct tm timeinfo;
             if (localtime_r(&now, &timeinfo)) {
-                char buf[6];
-                snprintf(buf, sizeof(buf), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
-                lv_label_set_text(ui.dhw_time, buf);
+                if (LastVals.last_minute != timeinfo.tm_min) {
+                    LastVals.last_minute = timeinfo.tm_min;
+                    char buf[6];
+                    snprintf(buf, sizeof(buf), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+                    lv_label_set_text(ui.dhw_time, buf);
+                }
             }    
         }
     }
@@ -582,37 +650,34 @@ void updateDashboardUI() {
 
 // Display loop
 void display_loop() {
-    static bool last_touch = false;
-
     gt911->read();
     bool current_touch = gt911->isTouched;
 
     if (current_touch) {
-        touch_x = gt911->points[0].x;
-        touch_y = gt911->points[0].y;
+        touch.x = gt911->points[0].x;
+        touch.y = gt911->points[0].y;
     }
-    touch_pressed = current_touch;
-    if (current_touch && !last_touch) {
-        if (!display_on) displayOn();
-        display_last_touch = millis();
+    touch.pressed = current_touch;
+    if (current_touch && !touch.last_state) {
+        if (!display.on) displayOn();
+        display.last_touch = millis();
     }
-    last_touch = current_touch;
+    touch.last_state = current_touch;
 
 #if defined(USE_AHT20)
-    if (aht20Sensor.read) {
-        if ((millis() - aht20Sensor.last_read) > aht20Sensor.period) {
-            aht20Sensor.last_read = millis();
+    if (SensorAHT20.read) {
+        if ((millis() - SensorAHT20.last_read) > SensorAHT20.period) {
+            SensorAHT20.last_read = millis();
             update_aht20();
         }
     }
 #endif
 
-    if (display_on &&
-        (millis() - display_last_touch > display_timeout * 1000)) {
+    if (display.on && (millis() - display.last_touch > settings.display.timeout_ms)) {
         displayOff();
     }
 
-    if (!display_on) return;
+    if (!display.on) return;
 
     updateDashboardUI();
     lv_timer_handler();
@@ -625,7 +690,9 @@ public:
         : LeanTask(_enabled, _interval) {}
 
 private:
-    void setup() override {}
+    void setup() override {
+        settings.display.enabled = true; 
+    }
     void loop() override {
         if (vars.states.restarting || vars.states.upgrading) {
           return;

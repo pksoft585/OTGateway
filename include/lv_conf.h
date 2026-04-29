@@ -8,12 +8,12 @@
 
 /* Memory */
 #define LV_MEM_SIZE              (64 * 1024U)
-#define LV_DRAW_BUF_STRIDE_ALIGN 4
+#define LV_DRAW_BUF_STRIDE_ALIGN 1
 #define LV_DRAW_BUF_ALIGN        4
 
 /* Logging */
 #define LV_USE_LOG               0
-#define LV_LOG_LEVEL             LV_LOG_LEVEL_INFO
+#define LV_LOG_LEVEL             LV_LOG_LEVEL_WARN
 
 /* Fonts */
 #define LV_FONT_MONTSERRAT_14    1
@@ -24,6 +24,7 @@
 
 /* Recommended for performance */
 #define LV_USE_DRAW_SW           1
+#define LV_DEF_REFR_PERIOD       16
 #define LV_DRAW_SW_COMPLEX       1
 #define LV_DRAW_SW_SHADOW_CACHE  1
 #define LV_INDEV_DEF_READ_PERIOD 50

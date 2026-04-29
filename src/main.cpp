@@ -242,7 +242,7 @@ void setup() {
   #if defined(DISPLAY_ENABLED)
     if (display_init_result == DisplayInitResult::OK) {
       Log.sinfoln(FPSTR(L_DISPLAY), F("Display task ready to start"));
-      tDisplay = new DisplayTask(true, 50);
+      tDisplay = new DisplayTask(true, 16);
       Scheduler.start(tDisplay);
     } else {
       Log.serrorln(FPSTR(L_DISPLAY), "Display initialization failed, reason = %u", displayInitResultToString(display_init_result));

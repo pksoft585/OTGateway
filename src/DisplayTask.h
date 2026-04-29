@@ -46,7 +46,7 @@ LV_FONT_DECLARE(mdi_24);
 #define TOUCH_SDA   17
 #define TOUCH_SCL   18
 #define TOUCH_INT   10
-#define TOUCH_RST   -1
+#define TOUCH_RST   GFX_NOT_DEFINED
 #define TOUCH_GT911_ROTATION ROTATION_INVERTED
 
 const char L_DISPLAY[]  PROGMEM = "DISPLAY";
@@ -92,7 +92,7 @@ const char* displayInitResultToString(DisplayInitResult r)
 #endif
 
 // Global display objects
-Arduino_DataBus          *init_bus      = nullptr;
+Arduino_DataBus          *bus           = nullptr;
 Arduino_ESP32RGBPanel    *rgbpanel      = nullptr;
 Arduino_RGB_Display      *gfx           = nullptr;
 TAMC_GT911               *gt911         = nullptr;
@@ -211,7 +211,6 @@ static void dhw_enable_cb(lv_event_t *e) {
 
 // Display functions
 void displayOn() {
-    lv_display_flush_ready(lv_display);
     display.on = true;
     pinMode(DISP_BACKLIGHT, OUTPUT);
     digitalWrite(DISP_BACKLIGHT, HIGH);
@@ -227,8 +226,8 @@ void displayOff() {
 // Display initialization
 DisplayInitResult display_init()
 {
-  init_bus = new Arduino_SWSPI(-1, DISP_CS, DISP_SCK, DISP_SDA, -1);
-  if (!init_bus) return DisplayInitResult::BUS_FAIL;
+  bus = new Arduino_SWSPI(GFX_NOT_DEFINED, DISP_CS, DISP_SCK, DISP_SDA, GFX_NOT_DEFINED);
+  if (!bus) return DisplayInitResult::BUS_FAIL;
 
   rgbpanel = new Arduino_ESP32RGBPanel(
     DISP_DE /* DE */, DISP_VSYNC /* VSYNC */, DISP_HSYNC /* HSYNC */, DISP_PCLK /* PCLK */,
@@ -243,13 +242,12 @@ DisplayInitResult display_init()
 
   gfx = new Arduino_RGB_Display(
     DISP_WIDTH, DISP_HEIGHT, rgbpanel, 0, true,
-    init_bus, DISP_RST, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
+    bus, DISP_RST, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
     if (!gfx) return DisplayInitResult::GFX_ALLOC_FAIL;
 
   if (!gfx->begin()) return DisplayInitResult::GFX_BEGIN_FAIL;
 
   Wire.begin(TOUCH_SDA, TOUCH_SCL);
-  Wire.setClock(400000);
 
   gt911 = new TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, DISP_WIDTH, DISP_HEIGHT);
   if (!gt911) return DisplayInitResult::TOUCH_FAIL;
@@ -290,14 +288,14 @@ DisplayInitResult display_init()
   lv_indev_set_display(indev, lv_display);
 
   const esp_timer_create_args_t tick_args = {
-    .callback = [](void*) { lv_tick_inc(5); },
+    .callback = [](void*) { lv_tick_inc(16); },
     .arg = NULL,
     .dispatch_method = ESP_TIMER_TASK,
     .name = "lvgl_tick"
   };
   if (esp_timer_create(&tick_args, &lvgl_tick_timer) != ESP_OK) return DisplayInitResult::TIMER_FAIL;
 
-  esp_timer_start_periodic(lvgl_tick_timer, 5000);
+  esp_timer_start_periodic(lvgl_tick_timer, 16000);
 
 #if defined(USE_AHT20)
   if (!aht20.begin()) {
@@ -686,7 +684,7 @@ void display_loop() {
 // Display Task definition
 class DisplayTask : public LeanTask {
 public:
-    DisplayTask(bool _enabled = true, uint32_t _interval = 5)
+    DisplayTask(bool _enabled = false, unsigned long _interval = 0)
         : LeanTask(_enabled, _interval) {}
 
 private:

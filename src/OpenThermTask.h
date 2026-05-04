@@ -39,11 +39,19 @@ protected:
   }
   
   BaseType_t getTaskCore() override {
-    return 1;
+#if defined(DISPLAY_ENABLED)
+      return 0;
+#else  
+      return 1;
+#endif
   }
 
   int getTaskPriority() override {
-    return 5;
+#if defined(DISPLAY_ENABLED)
+      return 4;
+#else  
+      return 5;
+#endif
   }
   #endif
 

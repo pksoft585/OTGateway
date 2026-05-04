@@ -256,7 +256,7 @@ DisplayInitResult display_init()
   gt911->setRotation(TOUCH_GT911_ROTATION);
 
   lv_init();
-
+/*
   size_t buf_size = (DISP_WIDTH * DISP_HEIGHT) * sizeof(lv_color_t);
 
   lv_buf1 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -278,6 +278,19 @@ DisplayInitResult display_init()
   } else {
     lv_display_set_buffers(lv_display, lv_buf1, nullptr, buf_size, LV_DISPLAY_RENDER_MODE_FULL);
   }
+*/
+  size_t buf_size = (DISP_WIDTH * 40) * sizeof(lv_color_t);
+
+//  lv_buf1 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+  lv_buf1 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_INTERNAL);
+  if (!lv_buf1) return DisplayInitResult::LV_BUF_FAIL;
+
+  lv_display = lv_display_create(DISP_WIDTH, DISP_HEIGHT);
+  if (!lv_display) return DisplayInitResult::LV_DISPLAY_FAIL;
+
+  lv_display_set_flush_cb(lv_display, my_disp_flush);
+  lv_display_set_buffers(lv_display, lv_buf1, NULL, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+
   lv_display_set_default(lv_display);
 
   lv_indev_t *indev = lv_indev_create();
@@ -328,12 +341,19 @@ void my_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
 
 // UI Creation
 void createDashboardUI() {
+    lv_obj_clear_flag(lv_screen_active(), LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_t *scr = lv_screen_active();
+    lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clean(scr);
     lv_obj_set_style_bg_color(scr, lv_color_hex(0xF5F5F5), 0);
 
     // ===== HEATING SECTION (TOP) =====
     lv_obj_t *heat_cont = lv_obj_create(scr);
+    lv_obj_clear_flag(heat_cont, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(heat_cont, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+    lv_obj_set_scrollbar_mode(heat_cont, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_size(heat_cont, 460, 220);
     lv_obj_set_pos(heat_cont, 10, 20);
     lv_obj_set_style_bg_color(heat_cont, lv_color_hex(0xFFFFFF), 0);
@@ -344,6 +364,9 @@ void createDashboardUI() {
 
     // Title background bar
     lv_obj_t *heat_title_bg = lv_obj_create(heat_cont);
+    lv_obj_clear_flag(heat_title_bg, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(heat_title_bg, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+    lv_obj_set_scrollbar_mode(heat_title_bg, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_size(heat_title_bg, 460, 40);
     lv_obj_set_pos(heat_title_bg, 0, 0);
     lv_obj_set_style_bg_color(heat_title_bg, lv_color_hex(0xF0F8FF), 0);
@@ -441,6 +464,9 @@ void createDashboardUI() {
 
     // ===== DHW SECTION (BOTTOM) =====
     lv_obj_t *dhw_cont = lv_obj_create(scr);
+    lv_obj_clear_flag(dhw_cont, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(dhw_cont, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+    lv_obj_set_scrollbar_mode(dhw_cont, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_size(dhw_cont, 460, 220);
     lv_obj_set_pos(dhw_cont, 10, 250);
     lv_obj_set_style_bg_color(dhw_cont, lv_color_hex(0xFFFFFF), 0);
@@ -451,6 +477,9 @@ void createDashboardUI() {
 
     // Title background bar
     lv_obj_t *dhw_title_bg = lv_obj_create(dhw_cont);
+    lv_obj_clear_flag(dhw_title_bg, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(dhw_title_bg, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+    lv_obj_set_scrollbar_mode(dhw_title_bg, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_size(dhw_title_bg, 460, 40);
     lv_obj_set_pos(dhw_title_bg, 0, 0);
     lv_obj_set_style_bg_color(dhw_title_bg, lv_color_hex(0xF0F8FF), 0);
@@ -646,7 +675,6 @@ void updateDashboardUI() {
     }
 }
 
-// Display loop
 void display_loop() {
     gt911->read();
     bool current_touch = gt911->isTouched;
@@ -677,15 +705,31 @@ void display_loop() {
 
     if (!display.on) return;
 
-    updateDashboardUI();
     lv_timer_handler();
+
+    updateDashboardUI();
 }
 
 // Display Task definition
 class DisplayTask : public LeanTask {
 public:
-    DisplayTask(bool _enabled = false, unsigned long _interval = 0)
-        : LeanTask(_enabled, _interval) {}
+    DisplayTask(bool _enabled = false, unsigned long _interval = 0) : LeanTask(_enabled, _interval) {}
+
+protected:
+  #if defined(ARDUINO_ARCH_ESP32)
+  const char* getTaskName() override {
+    return "DisplayTask";
+  }
+
+  /*BaseType_t getTaskCore() override {
+    return 1;
+  }*/
+
+  int getTaskPriority() override {
+    return 3;
+  }
+  #endif
+
 
 private:
     void setup() override {

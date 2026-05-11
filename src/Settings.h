@@ -121,8 +121,8 @@ struct Settings {
     } overheatProtection;
 
     struct {
+      uint8_t highTemp = 15;
       uint8_t lowTemp = 10;
-      unsigned short thresholdTime = 600;
     } freezeProtection;
   } heating;
 
@@ -304,6 +304,7 @@ struct Variables {
       bool enabled = false;
       bool indoorTempControl = false;
       bool overheat = false;
+      bool freezing = false;
       float setpointTemp = 0.0f;
       float targetTemp = 0.0f;
       float currentTemp = 0.0f;

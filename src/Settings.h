@@ -49,6 +49,8 @@ struct Settings {
     struct {
       bool enabled = false;
       uint32_t timeout_ms = 30000; 
+      uint32_t save_time_ms= 3000; 
+      uint32_t splash_time_ms= 3000; 
     } display;
 #endif
 

@@ -8,6 +8,7 @@
 #endif
 
 LV_FONT_DECLARE(mdi_24);
+LV_IMG_DECLARE(ot_icon_boot);
 
 // HW pins
 #define DISP_CS 1
@@ -122,27 +123,44 @@ esp_timer_handle_t lvgl_tick_timer = nullptr;
 // UI objects
 struct
 {
-    // Heating
+    // Root/pages
+    lv_obj_t *root = nullptr;
+    lv_obj_t *page_heat = nullptr;
+    lv_obj_t *page_dhw = nullptr;
+
+    // ===== COMMON =====
+    lv_obj_t *heat_icon_flame = nullptr;
+    lv_obj_t *heat_icon_wifi = nullptr;
+    lv_obj_t *heat_icon_opentherm = nullptr;
+    lv_obj_t *heat_icon_mqtt = nullptr;
+    lv_obj_t *heat_time = nullptr;
+
+    lv_obj_t *dhw_icon_flame = nullptr;
+    lv_obj_t *dhw_icon_wifi = nullptr;
+    lv_obj_t *dhw_icon_opentherm = nullptr;
+    lv_obj_t *dhw_icon_mqtt = nullptr;
+    lv_obj_t *dhw_time = nullptr;
+
+    // ===== HEATING PAGE =====
+    lv_obj_t *heat_arc = nullptr;
     lv_obj_t *heat_title = nullptr;
     lv_obj_t *heat_setpoint = nullptr;
     lv_obj_t *heat_current = nullptr;
-    lv_obj_t *heat_btn_down = nullptr;
-    lv_obj_t *heat_btn_up = nullptr;
-    lv_obj_t *heat_sw_enable = nullptr;
-    lv_obj_t *heat_sw_turbo = nullptr;
-    lv_obj_t *heat_lbl_enable = nullptr;
-    lv_obj_t *heat_lbl_turbo = nullptr;
-    lv_obj_t *heat_flame_icon = nullptr;
-    lv_obj_t *heat_icon_wifi = nullptr;
-    // DHW
+    lv_obj_t *heat_action = nullptr;
+    lv_obj_t *heat_btn_turbo = nullptr;
+    lv_obj_t *heat_btn_on = nullptr;
+    lv_obj_t *heat_btn_next = nullptr;
+    lv_obj_t *heat_btn_prev = nullptr;
+
+    // ===== DHW PAGE =====
+    lv_obj_t *dhw_arc = nullptr;
     lv_obj_t *dhw_title = nullptr;
     lv_obj_t *dhw_setpoint = nullptr;
     lv_obj_t *dhw_current = nullptr;
-    lv_obj_t *dhw_btn_down = nullptr;
-    lv_obj_t *dhw_btn_up = nullptr;
-    lv_obj_t *dhw_sw_enable = nullptr;
-    lv_obj_t *dhw_lbl_enable = nullptr;
-    lv_obj_t *dhw_time = nullptr;
+    lv_obj_t *dhw_action = nullptr;
+    lv_obj_t *dhw_btn_on = nullptr;
+    lv_obj_t *dhw_btn_prev = nullptr;
+    lv_obj_t *dhw_btn_next = nullptr;
 } ui;
 
 // Last values for display update optimization
@@ -150,16 +168,22 @@ struct
 {
     int heating_target10 = -1;
     int heating_currentTemp10 = -1;
+    int heating_minTemp10 = -1;
+    int heating_maxTemp10 = -1;
     bool heating_enabled = false;
-    bool heating_turbo = false;
     bool heating_active = false;
-    int dhw_target10 = -1;
-    int dhw_currentTemp10 = -1;
+    bool heating_turbo = false;
+    int dhw_target = -1;
+    int dhw_currentTemp = -1;
+    int dhw_minTemp = -1;
+    int dhw_maxTemp = -1;
     bool dhw_enabled = false;
     bool dhw_active = false;
     int last_minute = -1;
     bool flame = false;
     bool wifi = false;
+    bool opentherm = false;
+    bool mqtt = false;
 } LastVals;
 
 struct
@@ -168,17 +192,22 @@ struct
     int16_t y = 0;
     bool pressed = false;
     bool last_state = false;
+    bool blocked = true;
+    bool wait_release = false;
 } touch;
 
 struct
 {
     bool on = true;
+    bool to_save = false;
     uint32_t last_touch = 0;
+    uint32_t last_save = 0;
 } display;
 
 // Forward declarations
 void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
 void my_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data);
+void createBootScreen();
 void createDashboardUI();
 void updateDashboardUI();
 
@@ -195,47 +224,36 @@ void update_aht20()
 }
 #endif
 
+// Page switching callbacks
+static void show_heat_page()
+{
+    lv_obj_clear_flag(ui.page_heat, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui.page_dhw, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void show_dhw_page()
+{
+    lv_obj_clear_flag(ui.page_dhw, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui.page_heat, LV_OBJ_FLAG_HIDDEN);
+}
+
 // Event callbacks
-static void heat_down_cb(lv_event_t *e)
-{
-    settings.heating.target = fmax(settings.heating.minTemp, settings.heating.target - 0.1f);
-    Log.sinfoln(FPSTR(L_DISPLAY), F("Heating target: %.1f°C"), settings.heating.target);
-}
-
-static void heat_up_cb(lv_event_t *e)
-{
-    settings.heating.target = fmin(settings.heating.maxTemp, settings.heating.target + 0.1f);
-    Log.sinfoln(FPSTR(L_DISPLAY), F("Heating target: %.1f°C"), settings.heating.target);
-}
-
 static void heat_enable_cb(lv_event_t *e)
 {
     settings.heating.enabled = lv_obj_has_state((lv_obj_t *)lv_event_get_target(e), LV_STATE_CHECKED);
-    Log.sinfoln(FPSTR(L_DISPLAY), F("Heating: %s"), settings.heating.enabled ? "enabled" : "disabled");
+    display.to_save = true;
 }
 
 static void heat_turbo_cb(lv_event_t *e)
 {
     settings.heating.turbo = lv_obj_has_state((lv_obj_t *)lv_event_get_target(e), LV_STATE_CHECKED);
-    Log.sinfoln(FPSTR(L_DISPLAY), F("Heating turbo: %s"), settings.heating.turbo ? "enabled" : "disabled");
-}
-
-static void dhw_down_cb(lv_event_t *e)
-{
-    settings.dhw.target = fmax(settings.dhw.minTemp, settings.dhw.target - 1.0f);
-    Log.sinfoln(FPSTR(L_DISPLAY), F("DHW target: %.1f°C"), settings.dhw.target);
-}
-
-static void dhw_up_cb(lv_event_t *e)
-{
-    settings.dhw.target = fmin(settings.dhw.maxTemp, settings.dhw.target + 1.0f);
-    Log.sinfoln(FPSTR(L_DISPLAY), F("DHW target: %.1f°C"), settings.dhw.target);
+    display.to_save = true;
 }
 
 static void dhw_enable_cb(lv_event_t *e)
 {
     settings.dhw.enabled = lv_obj_has_state((lv_obj_t *)lv_event_get_target(e), LV_STATE_CHECKED);
-    Log.sinfoln(FPSTR(L_DISPLAY), F("DHW: %s"), settings.dhw.enabled ? "enabled" : "disabled");
+    display.to_save = true;
 }
 
 // Display functions
@@ -257,8 +275,7 @@ void displayOff()
 DisplayInitResult display_init()
 {
     bus = new Arduino_SWSPI(GFX_NOT_DEFINED, DISP_CS, DISP_SCK, DISP_SDA, GFX_NOT_DEFINED);
-    if (!bus)
-        return DisplayInitResult::BUS_FAIL;
+    if (!bus) return DisplayInitResult::BUS_FAIL;
 
     rgbpanel = new Arduino_ESP32RGBPanel(
         DISP_DE /* DE */, DISP_VSYNC /* VSYNC */, DISP_HSYNC /* HSYNC */, DISP_PCLK /* PCLK */,
@@ -269,23 +286,19 @@ DisplayInitResult display_init()
         1 /* vsync_polarity */, 20 /* v_front */, 10 /* v_pulse */, 40 /* vsync_back_porch */,
         1 /* pclk_active_neg */, 10000000L /* 10MHz */,
         false /* bounce_buffer */);
-    if (!rgbpanel)
-        return DisplayInitResult::RGB_FAIL;
+    if (!rgbpanel) return DisplayInitResult::RGB_FAIL;
 
     gfx = new Arduino_RGB_Display(
         DISP_WIDTH, DISP_HEIGHT, rgbpanel, 0, true,
         bus, DISP_RST, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
-    if (!gfx)
-        return DisplayInitResult::GFX_ALLOC_FAIL;
+    if (!gfx) return DisplayInitResult::GFX_ALLOC_FAIL;
 
-    if (!gfx->begin())
-        return DisplayInitResult::GFX_BEGIN_FAIL;
+    if (!gfx->begin()) return DisplayInitResult::GFX_BEGIN_FAIL;
 
     Wire.begin(TOUCH_SDA, TOUCH_SCL);
 
     gt911 = new TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, DISP_WIDTH, DISP_HEIGHT);
-    if (!gt911)
-        return DisplayInitResult::TOUCH_FAIL;
+    if (!gt911) return DisplayInitResult::TOUCH_FAIL;
 
     gt911->begin();
     gt911->setRotation(TOUCH_GT911_ROTATION);
@@ -295,13 +308,13 @@ DisplayInitResult display_init()
     size_t buf_size = (DISP_WIDTH * 40) * sizeof(lv_color_t);
 
     lv_buf1 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-//    lv_buf1 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_INTERNAL);
-    if (!lv_buf1)
-        return DisplayInitResult::LV_BUF_FAIL;
+/*  Internal buffer only
+    lv_buf1 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_INTERNAL);
+*/    
+    if (!lv_buf1) return DisplayInitResult::LV_BUF_FAIL;
 
     lv_display = lv_display_create(DISP_WIDTH, DISP_HEIGHT);
-    if (!lv_display)
-        return DisplayInitResult::LV_DISPLAY_FAIL;
+    if (!lv_display) return DisplayInitResult::LV_DISPLAY_FAIL;
 
     lv_display_set_flush_cb(lv_display, my_disp_flush);
     lv_display_set_buffers(lv_display, lv_buf1, NULL, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
@@ -309,8 +322,7 @@ DisplayInitResult display_init()
     lv_display_set_default(lv_display);
 
     lv_indev_t *indev = lv_indev_create();
-    if (!indev)
-        return DisplayInitResult::LV_INDEV_FAIL;
+    if (!indev) return DisplayInitResult::LV_INDEV_FAIL;
 
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, my_touchpad_read);
@@ -322,8 +334,7 @@ DisplayInitResult display_init()
         .arg = NULL,
         .dispatch_method = ESP_TIMER_TASK,
         .name = "lvgl_tick"};
-    if (esp_timer_create(&tick_args, &lvgl_tick_timer) != ESP_OK)
-        return DisplayInitResult::TIMER_FAIL;
+    if (esp_timer_create(&tick_args, &lvgl_tick_timer) != ESP_OK) return DisplayInitResult::TIMER_FAIL;
 
     esp_timer_start_periodic(lvgl_tick_timer, DISPLAYTASK_INTERVAL * 1000);
 
@@ -338,8 +349,9 @@ DisplayInitResult display_init()
     }
 #endif
 
-    createDashboardUI();
-
+    createBootScreen();
+    lv_refr_now(NULL);
+    delay(DISPLAYTASK_INTERVAL * 2);
     displayOn();
 
     return DisplayInitResult::OK;
@@ -356,229 +368,569 @@ void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 
 void my_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
+    if (touch.blocked)
+    {
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }
+
+    if (touch.wait_release)
+    {
+        if (!touch.pressed)
+        {
+            touch.wait_release = false;
+        }
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }
+
     data->point.x = touch.x;
     data->point.y = touch.y;
     data->state = touch.pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
 }
 
-// UI Creation
-void createDashboardUI()
+// Boot Screen Creation
+void createBootScreen()
 {
-    lv_obj_clear_flag(lv_screen_active(), LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_t *scr = lv_screen_active();
+
+    lv_obj_set_style_bg_color( scr, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa( scr, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
     lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t *img = lv_image_create(scr);
+    lv_image_set_src(img, &ot_icon_boot);
+    lv_obj_align(img, LV_ALIGN_CENTER, 0, -40);
+    lv_obj_clear_flag(img, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(img, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+    lv_obj_set_scrollbar_mode(img, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t *label = lv_label_create(scr);
+    lv_label_set_text(label, "OTGateway");
+    lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_36, LV_PART_MAIN);
+    lv_obj_align_to(label, img, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
+
+    lv_obj_update_layout(scr);
+}
+
+// UI Creation
+void createDashboardUI()
+{
+    lv_obj_t *scr = lv_screen_active();
+
+    lv_obj_t *lbl;
+
+    static lv_style_t style_btn_off;
+    static lv_style_t style_btn_on_heat;
+    static lv_style_t style_btn_on_dhw;
+
     lv_obj_clean(scr);
-    lv_obj_set_style_bg_color(scr, lv_color_hex(0xF5F5F5), 0);
 
-    // ===== HEATING SECTION (TOP) =====
-    lv_obj_t *heat_cont = lv_obj_create(scr);
-    lv_obj_clear_flag(heat_cont, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_clear_flag(heat_cont, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-    lv_obj_set_scrollbar_mode(heat_cont, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_size(heat_cont, 460, 220);
-    lv_obj_set_pos(heat_cont, 10, 20);
-    lv_obj_set_style_bg_color(heat_cont, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_border_color(heat_cont, lv_color_hex(0xDDDDDD), 0);
-    lv_obj_set_style_border_width(heat_cont, 2, 0);
-    lv_obj_set_style_pad_all(heat_cont, 0, 0);
-    lv_obj_set_scrollbar_mode(heat_cont, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
 
-    // Title background bar
-    lv_obj_t *heat_title_bg = lv_obj_create(heat_cont);
-    lv_obj_clear_flag(heat_title_bg, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_clear_flag(heat_title_bg, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-    lv_obj_set_scrollbar_mode(heat_title_bg, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_size(heat_title_bg, 460, 40);
-    lv_obj_set_pos(heat_title_bg, 0, 0);
-    lv_obj_set_style_bg_color(heat_title_bg, lv_color_hex(0xF0F8FF), 0);
-    lv_obj_set_style_border_width(heat_title_bg, 0, 0);
-    lv_obj_set_scrollbar_mode(heat_title_bg, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+    lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
 
-    ui.heat_title = lv_label_create(heat_title_bg);
-    lv_label_set_text(ui.heat_title, "Heating");
-    lv_obj_set_style_text_font(ui.heat_title, &lv_font_montserrat_18, 0);
-    lv_obj_set_style_text_color(ui.heat_title, lv_color_hex(0x0066CC), 0);
-    lv_obj_align(ui.heat_title, LV_ALIGN_CENTER, 0, 0);
+    // ---- BUTTONS DEFAULT ----
+    lv_style_init(&style_btn_off);
+    lv_style_set_bg_opa(&style_btn_off, LV_OPA_TRANSP);
+    lv_style_set_border_width(&style_btn_off, 2);
+    lv_style_set_border_color(&style_btn_off, lv_color_hex(0x808080));
+    lv_style_set_text_color(&style_btn_off, lv_color_white());
+    lv_style_set_radius(&style_btn_off, 10);
 
-    // Flame icon
-    ui.heat_flame_icon = lv_label_create(heat_title_bg);
-    lv_obj_set_style_text_font(ui.heat_flame_icon, &mdi_24, 0);
-    lv_label_set_text(ui.heat_flame_icon, "\xF3\xB0\x88\xB8");
-    lv_obj_set_style_text_color(ui.heat_flame_icon, lv_color_hex(0x0066CC), 0);
-    lv_obj_align(ui.heat_flame_icon, LV_ALIGN_LEFT_MID, 0, -1);
-    lv_obj_add_flag(ui.heat_flame_icon, LV_OBJ_FLAG_HIDDEN);
+    lv_style_init(&style_btn_on_heat);
+    lv_style_set_bg_opa(&style_btn_on_heat, LV_OPA_COVER);
+    lv_style_set_bg_color(&style_btn_on_heat, lv_color_hex(0xFF6F22));
+    lv_style_set_border_width(&style_btn_on_heat, 2);
+    lv_style_set_border_color(&style_btn_on_heat, lv_color_white());
+    lv_style_set_text_color(&style_btn_on_heat, lv_color_white());
+    lv_style_set_radius(&style_btn_on_heat, 10);
 
-    // WIFI icon
-    ui.heat_icon_wifi = lv_label_create(heat_title_bg);
+    lv_style_init(&style_btn_on_dhw);
+    lv_style_set_bg_opa(&style_btn_on_dhw, LV_OPA_COVER);
+    lv_style_set_bg_color(&style_btn_on_dhw, lv_color_hex(0x2095F6));
+    lv_style_set_border_width(&style_btn_on_dhw, 2);
+    lv_style_set_border_color(&style_btn_on_dhw, lv_color_white());
+    lv_style_set_text_color(&style_btn_on_dhw, lv_color_white());
+    lv_style_set_radius(&style_btn_on_dhw, 10);
+
+    // =====================================================
+    // ROOT
+    // =====================================================
+    ui.root = lv_obj_create(scr);
+    lv_obj_set_size(ui.root, DISP_WIDTH, DISP_HEIGHT);
+    lv_obj_set_pos(ui.root, 0, 0);
+
+    lv_obj_clear_flag(ui.root, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(ui.root, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+
+    lv_obj_set_style_border_width(ui.root, 0, 0);
+    lv_obj_set_style_radius(ui.root, 0, 0);
+    lv_obj_set_style_bg_color(ui.root, lv_color_black(), 0);
+    lv_obj_set_style_pad_all(ui.root, 0, 0);
+
+    // =====================================================
+    // HEATING PAGE
+    // =====================================================
+    ui.page_heat = lv_obj_create(ui.root);
+
+    lv_obj_set_size(ui.page_heat, DISP_WIDTH, DISP_HEIGHT);
+    lv_obj_set_pos(ui.page_heat, 0, 0);
+
+    lv_obj_clear_flag(ui.page_heat, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(ui.page_heat, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+
+    lv_obj_set_style_border_width(ui.page_heat, 0, 0);
+    lv_obj_set_style_radius(ui.page_heat, 0, 0);
+    lv_obj_set_style_bg_color(ui.page_heat, lv_color_black(), 0);
+
+    // ---- Flame icon ----
+    ui.heat_icon_flame = lv_label_create(ui.page_heat);
+    lv_obj_set_style_text_font(ui.heat_icon_flame, &mdi_24, 0);
+    lv_label_set_text(ui.heat_icon_flame, "\xF3\xB0\x88\xB8");
+    lv_obj_set_style_text_color(ui.heat_icon_flame, lv_color_hex(0xFF6F22), 0);
+    lv_obj_align(ui.heat_icon_flame, LV_ALIGN_CENTER, 0, 120);
+    lv_obj_add_flag(ui.heat_icon_flame, LV_OBJ_FLAG_HIDDEN);
+
+    // ---- WIFI icon ----
+    ui.heat_icon_wifi = lv_label_create(ui.page_heat);
     lv_label_set_text(ui.heat_icon_wifi, LV_SYMBOL_WIFI);
     lv_obj_set_style_text_font(ui.heat_icon_wifi, &lv_font_montserrat_18, 0);
-    lv_obj_set_style_text_color(ui.heat_icon_wifi, lv_color_hex(0x0066CC), 0);
-    lv_obj_add_flag(ui.heat_icon_wifi, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_align(ui.heat_icon_wifi, LV_ALIGN_RIGHT_MID, -5, -1);
+    lv_obj_set_style_text_color(ui.heat_icon_wifi, lv_color_hex(0x808080), 0);
+    lv_obj_align(ui.heat_icon_wifi, LV_ALIGN_TOP_RIGHT, -9, 4);
 
-    // Down button
-    ui.heat_btn_down = lv_button_create(heat_cont);
-    lv_obj_set_size(ui.heat_btn_down, 50, 50);
-    lv_obj_set_pos(ui.heat_btn_down, 15, 60);
-    lv_obj_set_style_bg_color(ui.heat_btn_down, lv_color_hex(0xE8F4FF), 0);
-    lv_obj_set_style_border_color(ui.heat_btn_down, lv_color_hex(0x0066CC), 0);
-    lv_obj_set_style_border_width(ui.heat_btn_down, 2, 0);
-    lv_obj_add_event_cb(ui.heat_btn_down, heat_down_cb, LV_EVENT_CLICKED, nullptr);
+    // ---- OT icon ----
+    ui.heat_icon_opentherm = lv_label_create(ui.page_heat);
+    lv_label_set_text(ui.heat_icon_opentherm, "O");
+    lv_obj_set_style_text_font(ui.heat_icon_opentherm, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(ui.heat_icon_opentherm, lv_color_hex(0x808080), 0);
+    lv_obj_align(ui.heat_icon_opentherm, LV_ALIGN_TOP_RIGHT, -37, 4);
 
-    lv_obj_t *lbl = lv_label_create(ui.heat_btn_down);
-    lv_label_set_text(lbl, LV_SYMBOL_DOWN);
-    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(lbl, lv_color_hex(0x0066CC), 0);
+    // ---- MQTT icon ----
+    ui.heat_icon_mqtt = lv_label_create(ui.page_heat);
+    lv_label_set_text(ui.heat_icon_mqtt, "M");
+    lv_obj_set_style_text_font(ui.heat_icon_mqtt, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(ui.heat_icon_mqtt, lv_color_hex(0x808080), 0);
+    lv_obj_align(ui.heat_icon_mqtt, LV_ALIGN_TOP_RIGHT, -57, 4);
+
+    // ---- Time ----
+    ui.heat_time = lv_label_create(ui.page_heat);
+    lv_label_set_text(ui.heat_time, "--:--");
+    lv_obj_set_style_text_font(ui.heat_time, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(ui.heat_time, lv_color_white(), 0);
+    lv_obj_align(ui.heat_time, LV_ALIGN_TOP_LEFT, 5, 5);
+
+    // ---- ARC ----
+    ui.heat_arc = lv_arc_create(ui.page_heat);
+
+    lv_obj_set_size(ui.heat_arc, 420, 420);
+    lv_obj_align(ui.heat_arc, LV_ALIGN_CENTER, 0, -20);
+
+    LastVals.heating_minTemp10 = (int)(settings.heating.minTemp * 10.0f);;
+    LastVals.heating_maxTemp10 = (int)(settings.heating.maxTemp * 10.0f);
+
+    lv_arc_set_range(ui.heat_arc, LastVals.heating_minTemp10, LastVals.heating_maxTemp10);
+    lv_arc_set_bg_angles(ui.heat_arc, 135, 45);
+    lv_arc_set_value(ui.heat_arc, settings.heating.target * 10.0f);
+
+    lv_obj_set_style_arc_width(ui.heat_arc, 24, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(ui.heat_arc, lv_color_hex(0x292929), LV_PART_MAIN);
+
+    lv_obj_set_style_arc_width(ui.heat_arc, 24, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(ui.heat_arc, lv_color_hex(0xFF6F22), LV_PART_INDICATOR);
+
+    lv_obj_set_style_bg_color(ui.heat_arc, lv_color_white(), LV_PART_KNOB);
+
+    // ---- LABELS ----
+    ui.heat_action = lv_label_create(ui.page_heat);
+    lv_label_set_text(ui.heat_action, "---");
+    lv_obj_set_style_text_font(ui.heat_action, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(ui.heat_action, lv_color_hex(0xFF6F22), 0);
+    lv_obj_align(ui.heat_action, LV_ALIGN_CENTER, 0, -120);
+
+    ui.heat_setpoint = lv_label_create(ui.page_heat);
+    lv_label_set_text(ui.heat_setpoint, "--.-°");
+    lv_obj_set_style_text_font(ui.heat_setpoint, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_color(ui.heat_setpoint, lv_color_white(), 0);
+    lv_obj_align(ui.heat_setpoint, LV_ALIGN_CENTER, 0, -20);
+
+    ui.heat_current = lv_label_create(ui.page_heat);
+    lv_label_set_text(ui.heat_current, "--.-°");
+    lv_obj_set_style_text_font(ui.heat_current, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_color(ui.heat_current, lv_color_hex(0xFF6F22), 0);
+    lv_obj_align(ui.heat_current, LV_ALIGN_CENTER, 0, 60);
+
+    // ---- BUTTONS ----
+    // TURBO
+    ui.heat_btn_turbo = lv_button_create(ui.page_heat);
+
+    lv_obj_set_size(ui.heat_btn_turbo, 100, 50);
+    lv_obj_align(ui.heat_btn_turbo, LV_ALIGN_BOTTOM_LEFT, 120, -5);
+
+    lv_obj_add_style(ui.heat_btn_turbo, &style_btn_off, LV_PART_MAIN);
+    lv_obj_add_style(ui.heat_btn_turbo, &style_btn_on_heat, LV_STATE_CHECKED);
+
+    lv_obj_add_flag(ui.heat_btn_turbo, LV_OBJ_FLAG_CHECKABLE);
+
+    lv_obj_add_event_cb(ui.heat_btn_turbo, heat_turbo_cb, LV_EVENT_CLICKED, nullptr);
+
+    lbl = lv_label_create(ui.heat_btn_turbo);
+    lv_label_set_text(lbl, "TURBO");
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, 0);
     lv_obj_center(lbl);
 
-    // Setpoint temp (CENTER ONLY)
-    ui.heat_setpoint = lv_label_create(heat_cont);
-    lv_label_set_text(ui.heat_setpoint, "-- °C");
-    lv_obj_set_style_text_font(ui.heat_setpoint, &lv_font_montserrat_24, 0);
-    lv_obj_align(ui.heat_setpoint, LV_ALIGN_CENTER, 0, -25);
+    // HEAT
+    ui.heat_btn_on = lv_button_create(ui.page_heat);
 
-    // Current temp (below setpoint)
-    ui.heat_current = lv_label_create(heat_cont);
-    lv_label_set_text(ui.heat_current, "Current: -- °C");
-    lv_obj_set_style_text_font(ui.heat_current, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(ui.heat_current, lv_color_hex(0x666666), 0);
-    lv_obj_align(ui.heat_current, LV_ALIGN_CENTER, 0, 10);
+    lv_obj_set_size(ui.heat_btn_on, 100, 50);
+    lv_obj_align(ui.heat_btn_on, LV_ALIGN_BOTTOM_RIGHT, -120, -5);
 
-    // Up button
-    ui.heat_btn_up = lv_button_create(heat_cont);
-    lv_obj_set_size(ui.heat_btn_up, 50, 50);
-    lv_obj_set_pos(ui.heat_btn_up, 395, 60);
-    lv_obj_set_style_bg_color(ui.heat_btn_up, lv_color_hex(0xE8F4FF), 0);
-    lv_obj_set_style_border_color(ui.heat_btn_up, lv_color_hex(0x0066CC), 0);
-    lv_obj_set_style_border_width(ui.heat_btn_up, 2, 0);
-    lv_obj_add_event_cb(ui.heat_btn_up, heat_up_cb, LV_EVENT_CLICKED, nullptr);
+    lv_obj_add_style(ui.heat_btn_on, &style_btn_off, LV_PART_MAIN);
+    lv_obj_add_style(ui.heat_btn_on, &style_btn_on_heat, LV_STATE_CHECKED);
 
-    lbl = lv_label_create(ui.heat_btn_up);
-    lv_label_set_text(lbl, LV_SYMBOL_UP);
-    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(lbl, lv_color_hex(0x0066CC), 0);
+    lv_obj_add_flag(ui.heat_btn_on, LV_OBJ_FLAG_CHECKABLE);
+
+    lv_obj_add_event_cb(ui.heat_btn_on, heat_enable_cb, LV_EVENT_CLICKED, nullptr);
+
+    lbl = lv_label_create(ui.heat_btn_on);
+    lv_label_set_text(lbl, "HEAT");
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, 0);
     lv_obj_center(lbl);
 
-    // Enable switch
-    ui.heat_sw_enable = lv_switch_create(heat_cont);
-    lv_obj_set_size(ui.heat_sw_enable, 40, 24);
-    lv_obj_set_pos(ui.heat_sw_enable, 20, 165);
-    lv_obj_add_event_cb(ui.heat_sw_enable, heat_enable_cb, LV_EVENT_VALUE_CHANGED, nullptr);
-    if (settings.heating.enabled)
-        lv_obj_add_state(ui.heat_sw_enable, LV_STATE_CHECKED);
+    // NEXT, PREV PAGE
+    ui.heat_btn_next = lv_button_create(ui.page_heat);
 
-    ui.heat_lbl_enable = lv_label_create(heat_cont);
-    lv_label_set_text(ui.heat_lbl_enable, "Enable");
-    lv_obj_set_style_text_font(ui.heat_lbl_enable, &lv_font_montserrat_14, 0);
-    lv_obj_set_pos(ui.heat_lbl_enable, 65, 170);
+    lv_obj_set_size(ui.heat_btn_next, 54, 54);
+    lv_obj_align(ui.heat_btn_next, LV_ALIGN_BOTTOM_RIGHT, -1, -5);
 
-    // Turbo switch
-    ui.heat_sw_turbo = lv_switch_create(heat_cont);
-    lv_obj_set_size(ui.heat_sw_turbo, 40, 24);
-    lv_obj_set_pos(ui.heat_sw_turbo, 260, 165);
-    lv_obj_add_event_cb(ui.heat_sw_turbo, heat_turbo_cb, LV_EVENT_VALUE_CHANGED, nullptr);
-    if (settings.heating.turbo)
-        lv_obj_add_state(ui.heat_sw_turbo, LV_STATE_CHECKED);
+    lv_obj_set_style_bg_opa(ui.heat_btn_next, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ui.heat_btn_next, 2, 0);
+    lv_obj_set_style_border_color(ui.heat_btn_next, lv_color_hex(0x808080), 0);
+    lv_obj_set_style_radius(ui.heat_btn_next, 27, 0);
 
-    ui.heat_lbl_turbo = lv_label_create(heat_cont);
-    lv_label_set_text(ui.heat_lbl_turbo, "Turbo mode");
-    lv_obj_set_style_text_font(ui.heat_lbl_turbo, &lv_font_montserrat_14, 0);
-    lv_obj_set_pos(ui.heat_lbl_turbo, 305, 170);
+    lv_obj_add_event_cb(
+        ui.heat_btn_next,
+        [](lv_event_t *e)
+        {
+            show_dhw_page();
+        },
+        LV_EVENT_CLICKED,
+        NULL);
 
-    // ===== DHW SECTION (BOTTOM) =====
-    lv_obj_t *dhw_cont = lv_obj_create(scr);
-    lv_obj_clear_flag(dhw_cont, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_clear_flag(dhw_cont, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-    lv_obj_set_scrollbar_mode(dhw_cont, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_size(dhw_cont, 460, 220);
-    lv_obj_set_pos(dhw_cont, 10, 250);
-    lv_obj_set_style_bg_color(dhw_cont, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_border_color(dhw_cont, lv_color_hex(0xDDDDDD), 0);
-    lv_obj_set_style_border_width(dhw_cont, 2, 0);
-    lv_obj_set_style_pad_all(dhw_cont, 0, 0);
-    lv_obj_set_scrollbar_mode(dhw_cont, LV_SCROLLBAR_MODE_OFF);
-
-    // Title background bar
-    lv_obj_t *dhw_title_bg = lv_obj_create(dhw_cont);
-    lv_obj_clear_flag(dhw_title_bg, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_clear_flag(dhw_title_bg, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-    lv_obj_set_scrollbar_mode(dhw_title_bg, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_size(dhw_title_bg, 460, 40);
-    lv_obj_set_pos(dhw_title_bg, 0, 0);
-    lv_obj_set_style_bg_color(dhw_title_bg, lv_color_hex(0xF0F8FF), 0);
-    lv_obj_set_style_border_width(dhw_title_bg, 0, 0);
-    lv_obj_set_scrollbar_mode(dhw_title_bg, LV_SCROLLBAR_MODE_OFF);
-
-    ui.dhw_title = lv_label_create(dhw_title_bg);
-    lv_label_set_text(ui.dhw_title, "DHW");
-    lv_obj_set_style_text_font(ui.dhw_title, &lv_font_montserrat_18, 0);
-    lv_obj_set_style_text_color(ui.dhw_title, lv_color_hex(0x0066CC), 0);
-    lv_obj_align(ui.dhw_title, LV_ALIGN_CENTER, 0, 0);
-
-    // Down button
-    ui.dhw_btn_down = lv_button_create(dhw_cont);
-    lv_obj_set_size(ui.dhw_btn_down, 50, 50);
-    lv_obj_set_pos(ui.dhw_btn_down, 15, 60);
-    lv_obj_set_style_bg_color(ui.dhw_btn_down, lv_color_hex(0xE8F4FF), 0);
-    lv_obj_set_style_border_color(ui.dhw_btn_down, lv_color_hex(0x0066CC), 0);
-    lv_obj_set_style_border_width(ui.dhw_btn_down, 2, 0);
-    lv_obj_add_event_cb(ui.dhw_btn_down, dhw_down_cb, LV_EVENT_CLICKED, nullptr);
-
-    lbl = lv_label_create(ui.dhw_btn_down);
-    lv_label_set_text(lbl, LV_SYMBOL_DOWN);
-    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(lbl, lv_color_hex(0x0066CC), 0);
+    lbl = lv_label_create(ui.heat_btn_next);
+    lv_label_set_text(lbl, LV_SYMBOL_RIGHT);
+    lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
     lv_obj_center(lbl);
 
-    // Setpoint temp (CENTER ONLY)
-    ui.dhw_setpoint = lv_label_create(dhw_cont);
-    lv_label_set_text(ui.dhw_setpoint, "-- °C");
-    lv_obj_set_style_text_font(ui.dhw_setpoint, &lv_font_montserrat_24, 0);
-    lv_obj_align(ui.dhw_setpoint, LV_ALIGN_CENTER, 0, -25);
+    ui.heat_btn_prev = lv_button_create(ui.page_heat);
 
-    // Current temp (below setpoint)
-    ui.dhw_current = lv_label_create(dhw_cont);
-    lv_label_set_text(ui.dhw_current, "Current: -- °C");
-    lv_obj_set_style_text_font(ui.dhw_current, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(ui.dhw_current, lv_color_hex(0x666666), 0);
-    lv_obj_align(ui.dhw_current, LV_ALIGN_CENTER, 0, 10);
+    lv_obj_set_size(ui.heat_btn_prev, 54, 54);
+    lv_obj_align(ui.heat_btn_prev, LV_ALIGN_BOTTOM_LEFT, 1, -5);
 
-    // Up button
-    ui.dhw_btn_up = lv_button_create(dhw_cont);
-    lv_obj_set_size(ui.dhw_btn_up, 50, 50);
-    lv_obj_set_pos(ui.dhw_btn_up, 395, 60);
-    lv_obj_set_style_bg_color(ui.dhw_btn_up, lv_color_hex(0xE8F4FF), 0);
-    lv_obj_set_style_border_color(ui.dhw_btn_up, lv_color_hex(0x0066CC), 0);
-    lv_obj_set_style_border_width(ui.dhw_btn_up, 2, 0);
-    lv_obj_add_event_cb(ui.dhw_btn_up, dhw_up_cb, LV_EVENT_CLICKED, nullptr);
+    lv_obj_set_style_bg_opa(ui.heat_btn_prev, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ui.heat_btn_prev, 2, 0);
+    lv_obj_set_style_border_color(ui.heat_btn_prev, lv_color_hex(0x808080), 0);
+    lv_obj_set_style_radius(ui.heat_btn_prev, 27, 0);
 
-    lbl = lv_label_create(ui.dhw_btn_up);
-    lv_label_set_text(lbl, LV_SYMBOL_UP);
-    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(lbl, lv_color_hex(0x0066CC), 0);
+    lv_obj_add_event_cb(
+        ui.heat_btn_prev,
+        [](lv_event_t *e)
+        {
+            show_dhw_page();
+        },
+        LV_EVENT_CLICKED,
+        NULL);
+
+    lbl = lv_label_create(ui.heat_btn_prev);
+    lv_label_set_text(lbl, LV_SYMBOL_LEFT);
+    lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
     lv_obj_center(lbl);
 
-    // Enable switch
-    ui.dhw_sw_enable = lv_switch_create(dhw_cont);
-    lv_obj_set_size(ui.dhw_sw_enable, 40, 24);
-    lv_obj_set_pos(ui.dhw_sw_enable, 20, 165);
-    lv_obj_add_event_cb(ui.dhw_sw_enable, dhw_enable_cb, LV_EVENT_VALUE_CHANGED, nullptr);
-    if (settings.dhw.enabled)
-        lv_obj_add_state(ui.dhw_sw_enable, LV_STATE_CHECKED);
+    // =====================================================
+    // DHW PAGE
+    // =====================================================
+    ui.page_dhw = lv_obj_create(ui.root);
 
-    ui.dhw_lbl_enable = lv_label_create(dhw_cont);
-    lv_label_set_text(ui.dhw_lbl_enable, "Enable");
-    lv_obj_set_style_text_font(ui.dhw_lbl_enable, &lv_font_montserrat_14, 0);
-    lv_obj_set_pos(ui.dhw_lbl_enable, 65, 170);
+    lv_obj_set_size(ui.page_dhw, DISP_WIDTH, DISP_HEIGHT);
+    lv_obj_set_pos(ui.page_dhw, 0, 0);
 
-    // Time label
-    ui.dhw_time = lv_label_create(dhw_cont);
+    lv_obj_clear_flag(ui.page_dhw, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(ui.page_dhw, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+
+    lv_obj_set_style_border_width(ui.page_dhw, 0, 0);
+    lv_obj_set_style_radius(ui.page_dhw, 0, 0);
+    lv_obj_set_style_bg_color(ui.page_dhw, lv_color_black(), 0);
+
+    // Hidden by default
+    lv_obj_add_flag(ui.page_dhw, LV_OBJ_FLAG_HIDDEN);
+
+    // ---- Flame icon ----
+    ui.dhw_icon_flame = lv_label_create(ui.page_dhw);
+    lv_obj_set_style_text_font(ui.dhw_icon_flame, &mdi_24, 0);
+    lv_label_set_text(ui.dhw_icon_flame, "\xF3\xB0\x88\xB8");
+    lv_obj_set_style_text_color(ui.dhw_icon_flame, lv_color_hex(0x2095F6), 0);
+    lv_obj_align(ui.dhw_icon_flame, LV_ALIGN_CENTER, 0, 120);
+    lv_obj_add_flag(ui.dhw_icon_flame, LV_OBJ_FLAG_HIDDEN);
+
+    // ---- WIFI icon ----
+    ui.dhw_icon_wifi = lv_label_create(ui.page_dhw);
+    lv_label_set_text(ui.dhw_icon_wifi, LV_SYMBOL_WIFI);
+    lv_obj_set_style_text_font(ui.dhw_icon_wifi, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(ui.dhw_icon_wifi, lv_color_hex(0x808080), 0);
+    lv_obj_align(ui.dhw_icon_wifi, LV_ALIGN_TOP_RIGHT, -9, 4);
+
+    // ---- OT icon ----
+    ui.dhw_icon_opentherm = lv_label_create(ui.page_dhw);
+    lv_label_set_text(ui.dhw_icon_opentherm, "O");
+    lv_obj_set_style_text_font(ui.dhw_icon_opentherm, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(ui.dhw_icon_opentherm, lv_color_hex(0x808080), 0);
+    lv_obj_align(ui.dhw_icon_opentherm, LV_ALIGN_TOP_RIGHT, -37, 4);
+
+    // ---- MQTT icon ----
+    ui.dhw_icon_mqtt = lv_label_create(ui.page_dhw);
+    lv_label_set_text(ui.dhw_icon_mqtt, "M");
+    lv_obj_set_style_text_font(ui.dhw_icon_mqtt, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(ui.dhw_icon_mqtt, lv_color_hex(0x808080), 0);
+    lv_obj_align(ui.dhw_icon_mqtt, LV_ALIGN_TOP_RIGHT, -57, 4);
+
+    // ---- Time ----
+    ui.dhw_time = lv_label_create(ui.page_dhw);
     lv_label_set_text(ui.dhw_time, "--:--");
-    lv_obj_set_style_text_font(ui.dhw_time, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(ui.dhw_time, lv_color_hex(0x333333), 0);
-    lv_obj_align(ui.dhw_time, LV_ALIGN_BOTTOM_RIGHT, -20, -20);
+    lv_obj_set_style_text_font(ui.dhw_time, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(ui.dhw_time, lv_color_white(), 0);
+    lv_obj_align(ui.dhw_time, LV_ALIGN_TOP_LEFT, 5, 5);
+
+    // ---- ARC ----
+    ui.dhw_arc = lv_arc_create(ui.page_dhw);
+
+    lv_obj_set_size(ui.dhw_arc, 420, 420);
+    lv_obj_align(ui.dhw_arc, LV_ALIGN_CENTER, 0, -20);
+
+    LastVals.dhw_minTemp = (int)(settings.dhw.minTemp);
+    LastVals.dhw_maxTemp = (int)(settings.dhw.maxTemp);
+
+    lv_arc_set_range(ui.dhw_arc, LastVals.dhw_minTemp, LastVals.dhw_maxTemp);
+    lv_arc_set_bg_angles(ui.dhw_arc, 135, 45);
+    lv_arc_set_value(ui.dhw_arc, settings.dhw.target);
+
+    lv_obj_set_style_arc_width(ui.dhw_arc, 24, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(ui.dhw_arc, lv_color_hex(0x292929), LV_PART_MAIN);
+
+    lv_obj_set_style_arc_width(ui.dhw_arc, 24, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(ui.dhw_arc, lv_color_hex(0x2095F6), LV_PART_INDICATOR);
+
+    lv_obj_set_style_bg_color(ui.dhw_arc, lv_color_white(), LV_PART_KNOB);
+
+    // ---- LABELS ----
+    ui.dhw_action = lv_label_create(ui.page_dhw);
+    lv_label_set_text(ui.dhw_action, "---");
+    lv_obj_set_style_text_font(ui.dhw_action, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(ui.dhw_action, lv_color_hex(0x2095F6), 0);
+    lv_obj_align(ui.dhw_action, LV_ALIGN_CENTER, 0, -120);
+
+    ui.dhw_setpoint = lv_label_create(ui.page_dhw);
+    lv_label_set_text(ui.dhw_setpoint, "--.-°");
+    lv_obj_set_style_text_font(ui.dhw_setpoint, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_color(ui.dhw_setpoint, lv_color_white(), 0);
+    lv_obj_align(ui.dhw_setpoint, LV_ALIGN_CENTER, 0, -20);
+
+    ui.dhw_current = lv_label_create(ui.page_dhw);
+    lv_label_set_text(ui.dhw_current, "--.-°");
+    lv_obj_set_style_text_font(ui.dhw_current, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_color(ui.dhw_current, lv_color_hex(0x2095F6), 0);
+    lv_obj_align(ui.dhw_current, LV_ALIGN_CENTER, 0, 60);
+
+    // ---- BUTTONS ----
+    // ON
+    ui.dhw_btn_on = lv_button_create(ui.page_dhw);
+
+    lv_obj_set_size(ui.dhw_btn_on, 100, 50);
+    lv_obj_align(ui.dhw_btn_on, LV_ALIGN_BOTTOM_RIGHT, -120, -5);
+
+    lv_obj_add_style(ui.dhw_btn_on, &style_btn_off, LV_PART_MAIN);
+    lv_obj_add_style(ui.dhw_btn_on, &style_btn_on_dhw, LV_STATE_CHECKED);
+
+    lv_obj_add_flag(ui.dhw_btn_on, LV_OBJ_FLAG_CHECKABLE);
+
+    lv_obj_add_event_cb(ui.dhw_btn_on, dhw_enable_cb, LV_EVENT_CLICKED, nullptr);
+
+    lbl = lv_label_create(ui.dhw_btn_on);
+    lv_label_set_text(lbl, "DHW");
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, 0);
+    lv_obj_center(lbl);
+
+    // PREV, NEXT PAGE
+    ui.dhw_btn_prev = lv_button_create(ui.page_dhw);
+
+    lv_obj_set_size(ui.dhw_btn_prev, 54, 54);
+    lv_obj_align(ui.dhw_btn_prev, LV_ALIGN_BOTTOM_LEFT, 1, -5);
+
+    lv_obj_set_style_bg_opa(ui.dhw_btn_prev, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ui.dhw_btn_prev, 2, 0);
+    lv_obj_set_style_border_color(ui.dhw_btn_prev, lv_color_hex(0x808080), 0);
+    lv_obj_set_style_radius(ui.dhw_btn_prev, 27, 0);
+
+    lv_obj_add_event_cb(
+        ui.dhw_btn_prev,
+        [](lv_event_t *e)
+        {
+            show_heat_page();
+        },
+        LV_EVENT_CLICKED,
+        NULL);
+
+    lbl = lv_label_create(ui.dhw_btn_prev);
+    lv_label_set_text(lbl, LV_SYMBOL_LEFT);
+    lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
+    lv_obj_center(lbl);
+
+    ui.dhw_btn_next = lv_button_create(ui.page_dhw);
+
+    lv_obj_set_size(ui.dhw_btn_next, 54, 54);
+    lv_obj_align(ui.dhw_btn_next, LV_ALIGN_BOTTOM_RIGHT, -1, -5);
+
+    lv_obj_set_style_bg_opa(ui.dhw_btn_next, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ui.dhw_btn_next, 2, 0);
+    lv_obj_set_style_border_color(ui.dhw_btn_next, lv_color_hex(0x808080), 0);
+    lv_obj_set_style_radius(ui.dhw_btn_next, 27, 0);
+
+    lv_obj_add_event_cb(
+        ui.dhw_btn_next,
+        [](lv_event_t *e)
+        {
+            show_heat_page();
+        },
+        LV_EVENT_CLICKED,
+        NULL);
+
+    lbl = lv_label_create(ui.dhw_btn_next);
+    lv_label_set_text(lbl, LV_SYMBOL_RIGHT);
+    lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
+    lv_obj_center(lbl);
+
+    // =====================================================
+    // ARC EVENTS
+    // =====================================================
+    lv_obj_add_event_cb(
+        ui.heat_arc,
+        [](lv_event_t *e)
+        {
+            lv_obj_t *arc = (lv_obj_t *)lv_event_get_target(e);
+
+            int value = lv_arc_get_value(arc);
+
+            float temp = value / 10.0f;
+
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%.1f°C", temp);
+
+            lv_label_set_text(ui.heat_setpoint, buf);
+        },
+        LV_EVENT_VALUE_CHANGED,
+        NULL);
+
+    lv_obj_add_event_cb(
+        ui.heat_arc,
+        [](lv_event_t *e)
+        {
+            lv_obj_t *arc = (lv_obj_t *)lv_event_get_target(e);
+
+            int value = lv_arc_get_value(arc);
+
+            settings.heating.target = value / 10.0f;
+            display.to_save = true;
+        },
+        LV_EVENT_RELEASED,
+        NULL);
+
+    lv_obj_add_event_cb(
+        ui.dhw_arc,
+        [](lv_event_t *e)
+        {
+            lv_obj_t *arc = (lv_obj_t *)lv_event_get_target(e);
+
+            int value = lv_arc_get_value(arc);
+
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%d°C", value);
+
+            lv_label_set_text(ui.dhw_setpoint, buf);
+        },
+        LV_EVENT_VALUE_CHANGED,
+        NULL);
+
+    lv_obj_add_event_cb(
+        ui.dhw_arc,
+        [](lv_event_t *e)
+        {
+            lv_obj_t *arc = (lv_obj_t *)lv_event_get_target(e);
+
+            int value = lv_arc_get_value(arc);
+
+            settings.dhw.target = value;
+            display.to_save = true;
+        },
+        LV_EVENT_RELEASED,
+        NULL);
+
+    // =====================================================
+    // INITIAL VALUES
+    // =====================================================
+    lv_arc_set_value(ui.heat_arc, (int)(settings.heating.target * 10.0f));
+    lv_arc_set_value(ui.dhw_arc, (int)(settings.dhw.target));
+
+    LastVals.heating_enabled = settings.heating.enabled;
+    if (ui.heat_btn_on)
+    {
+        if (settings.heating.enabled)
+        {
+            lv_obj_add_state(ui.heat_btn_on, LV_STATE_CHECKED);
+        }
+        else
+        {
+            lv_obj_clear_state(ui.heat_btn_on, LV_STATE_CHECKED);
+        }
+    }
+
+    LastVals.heating_turbo = settings.heating.turbo;
+    if (ui.heat_btn_turbo)
+    {
+        if (settings.heating.turbo)
+        {
+            lv_obj_add_state(ui.heat_btn_turbo, LV_STATE_CHECKED);
+        }
+        else
+        {
+            lv_obj_clear_state(ui.heat_btn_turbo, LV_STATE_CHECKED);
+        }
+    }
+
+    LastVals.dhw_enabled = settings.dhw.enabled;
+    if (ui.dhw_btn_on)
+    {
+        if (settings.dhw.enabled)
+        {
+            lv_obj_add_state(ui.dhw_btn_on, LV_STATE_CHECKED);
+        }
+        else
+        {
+            lv_obj_clear_state(ui.dhw_btn_on, LV_STATE_CHECKED);
+        }
+    }
+
+    LastVals.heating_active = !vars.slave.heating.active;
+    LastVals.dhw_active = !vars.slave.dhw.active;
+    LastVals.flame = !vars.slave.flame;
+    LastVals.wifi = !vars.network.connected;
+    LastVals.mqtt = !vars.mqtt.connected;
+    LastVals.opentherm = !vars.slave.connected;
+
+    show_heat_page();
 }
 
 // UI Update
@@ -591,88 +943,84 @@ void updateDashboardUI()
         if (LastVals.heating_target10 != t10)
         {
             LastVals.heating_target10 = t10;
-            lv_label_set_text_fmt(ui.heat_setpoint, "%d.%d °C", t10 / 10, abs(t10 % 10));
+            lv_label_set_text_fmt(ui.heat_setpoint, "%d.%d°C", t10 / 10, abs(t10 % 10));
+            if (ui.heat_arc)
+            {
+                if (lv_arc_get_value(ui.heat_arc) != t10)
+                {
+                    lv_arc_set_value(ui.heat_arc, t10);
+                }
+            }
         }
     }
 
     if (ui.heat_current)
     {
+        int t11 = (int)(settings.heating.minTemp * 10.0f);
+        int t12 = (int)(settings.heating.maxTemp * 10.0f);
+
+        if ((LastVals.heating_minTemp10 != t11) || (LastVals.heating_maxTemp10 != t12))
+        {
+            LastVals.heating_minTemp10 = t11;
+            LastVals.heating_maxTemp10 = t12;
+            if (ui.heat_arc)
+            {
+                lv_arc_set_range(ui.heat_arc, LastVals.heating_minTemp10, LastVals.heating_maxTemp10);
+            }
+        }
+
         int t10 = (int)(vars.slave.heating.currentTemp * 10.0f);
         if (LastVals.heating_currentTemp10 != t10)
         {
             LastVals.heating_currentTemp10 = t10;
-            lv_label_set_text_fmt(ui.heat_current, "Current: %d.%d °C", t10 / 10, abs(t10 % 10));
+            lv_label_set_text_fmt(ui.heat_current, "%d.%d°C", t10 / 10, abs(t10 % 10));
         }
     }
 
-    if (ui.heat_sw_enable)
+    if (LastVals.heating_enabled != settings.heating.enabled)
     {
-        if (LastVals.heating_enabled != settings.heating.enabled)
+        LastVals.heating_enabled = settings.heating.enabled;
+        if (ui.heat_btn_on)
         {
-            LastVals.heating_enabled = settings.heating.enabled;
-            if (LastVals.heating_enabled)
-                lv_obj_add_state(ui.heat_sw_enable, LV_STATE_CHECKED);
+            if (settings.heating.enabled)
+            {
+                lv_obj_add_state(ui.heat_btn_on, LV_STATE_CHECKED);
+            }
             else
-                lv_obj_clear_state(ui.heat_sw_enable, LV_STATE_CHECKED);
+            {
+                lv_obj_clear_state(ui.heat_btn_on, LV_STATE_CHECKED);
+            }
         }
     }
 
-    if (ui.heat_sw_turbo)
+    if (LastVals.heating_turbo != settings.heating.turbo)
     {
-        if (LastVals.heating_turbo != settings.heating.turbo)
+        LastVals.heating_turbo = settings.heating.turbo;
+        if (ui.heat_btn_turbo)
         {
-            LastVals.heating_turbo = settings.heating.turbo;
-            if (LastVals.heating_turbo)
-                lv_obj_add_state(ui.heat_sw_turbo, LV_STATE_CHECKED);
+            if (settings.heating.turbo)
+            {
+                lv_obj_add_state(ui.heat_btn_turbo, LV_STATE_CHECKED);
+            }
             else
-                lv_obj_clear_state(ui.heat_sw_turbo, LV_STATE_CHECKED);
+            {
+                lv_obj_clear_state(ui.heat_btn_turbo, LV_STATE_CHECKED);
+            }
         }
     }
 
-    if (ui.heat_title)
+    if (ui.heat_action)
     {
         if (LastVals.heating_active != vars.slave.heating.active)
         {
             LastVals.heating_active = vars.slave.heating.active;
             if (vars.slave.heating.active)
             {
-                lv_obj_set_style_text_color(ui.heat_title, lv_color_hex(0xC62828), 0);
+                lv_label_set_text(ui.heat_action, S_HEATING);
             }
             else
             {
-                lv_obj_set_style_text_color(ui.heat_title, lv_color_hex(0x0066CC), 0);
-            }
-        }
-    }
-
-    if (ui.heat_flame_icon)
-    {
-        if (LastVals.flame != vars.slave.flame)
-        {
-            LastVals.flame = vars.slave.flame;
-            if (LastVals.flame)
-            {
-                lv_obj_clear_flag(ui.heat_flame_icon, LV_OBJ_FLAG_HIDDEN);
-            }
-            else
-            {
-                lv_obj_add_flag(ui.heat_flame_icon, LV_OBJ_FLAG_HIDDEN);
-            }
-        }
-    }
-
-    if (ui.heat_icon_wifi)
-    {
-        if (LastVals.wifi != vars.network.connected)
-        {
-            LastVals.wifi = vars.network.connected;
-            if (LastVals.wifi)
-            {
-                lv_obj_clear_flag(ui.heat_icon_wifi, LV_OBJ_FLAG_HIDDEN);
-            }
-            else
-            {
-                lv_obj_add_flag(ui.heat_icon_wifi, LV_OBJ_FLAG_HIDDEN);
+                lv_label_set_text(ui.heat_action, " ");
             }
         }
     }
@@ -680,67 +1028,164 @@ void updateDashboardUI()
     // Update DHW section
     if (ui.dhw_setpoint)
     {
-        int t10 = (int)(settings.dhw.target * 10.0f);
-        if (LastVals.dhw_target10 != t10)
+        int t10 = (int)(settings.dhw.target);
+        if (LastVals.dhw_target != t10)
         {
-            LastVals.dhw_target10 = t10;
-            lv_label_set_text_fmt(ui.dhw_setpoint, "%d.%d °C", t10 / 10, abs(t10 % 10));
+            LastVals.dhw_target = t10;
+            lv_label_set_text_fmt(ui.dhw_setpoint, "%d°C", t10);
+            if (ui.dhw_arc)
+            {
+                if (lv_arc_get_value(ui.dhw_arc) != t10)
+                {
+                    lv_arc_set_value(ui.dhw_arc, t10);
+                }
+            }
         }
     }
 
     if (ui.dhw_current)
     {
+        if ((LastVals.dhw_minTemp != (int)(settings.dhw.minTemp)) || (LastVals.dhw_maxTemp != (int)(settings.dhw.maxTemp)))
+        {
+            LastVals.dhw_minTemp = (int)(settings.dhw.minTemp);
+            LastVals.dhw_maxTemp = (int)(settings.dhw.maxTemp);
+            if (ui.dhw_arc)
+            {
+                lv_arc_set_range(ui.dhw_arc, LastVals.dhw_minTemp, LastVals.dhw_maxTemp);
+            }
+        }
+
         int t10 = (int)(vars.slave.dhw.currentTemp * 10.0f);
-        if (LastVals.dhw_currentTemp10 != t10)
+        if (LastVals.dhw_currentTemp != t10)
         {
-            LastVals.dhw_currentTemp10 = t10;
-            lv_label_set_text_fmt(ui.dhw_current, "Current: %d.%d °C", t10 / 10, abs(t10 % 10));
+            LastVals.dhw_currentTemp = t10;
+            lv_label_set_text_fmt(ui.dhw_current, "%d.%d°C", t10 / 10, abs(t10 % 10));
         }
     }
 
-    if (ui.dhw_sw_enable)
+    if (LastVals.dhw_enabled != settings.dhw.enabled)
     {
-        if (LastVals.dhw_enabled != settings.dhw.enabled)
+        LastVals.dhw_enabled = settings.dhw.enabled;
+        if (ui.dhw_btn_on)
         {
-            LastVals.dhw_enabled = settings.dhw.enabled;
-            if (LastVals.dhw_enabled)
-                lv_obj_add_state(ui.dhw_sw_enable, LV_STATE_CHECKED);
+            if (settings.dhw.enabled)
+            {
+                lv_obj_add_state(ui.dhw_btn_on, LV_STATE_CHECKED);
+            }
             else
-                lv_obj_clear_state(ui.dhw_sw_enable, LV_STATE_CHECKED);
+            {
+                lv_obj_clear_state(ui.dhw_btn_on, LV_STATE_CHECKED);
+            }
         }
     }
 
-    if (ui.dhw_title)
+    if (ui.dhw_action)
     {
         if (LastVals.dhw_active != vars.slave.dhw.active)
         {
             LastVals.dhw_active = vars.slave.dhw.active;
             if (vars.slave.dhw.active)
             {
-                lv_obj_set_style_text_color(ui.dhw_title, lv_color_hex(0xC62828), 0);
+                lv_label_set_text(ui.dhw_action, S_HEATING);
             }
             else
             {
-                lv_obj_set_style_text_color(ui.dhw_title, lv_color_hex(0x0066CC), 0);
+                lv_label_set_text(ui.dhw_action, " ");
             }
         }
     }
 
-    if (ui.dhw_time)
+    if (LastVals.flame != vars.slave.flame)
     {
-        time_t now = time(nullptr);
-        if (now > 100000)
+        LastVals.flame = vars.slave.flame;
+        if (ui.heat_icon_flame)
         {
-            struct tm timeinfo;
-            if (localtime_r(&now, &timeinfo))
+            if (LastVals.flame)
+                lv_obj_clear_flag(ui.heat_icon_flame, LV_OBJ_FLAG_HIDDEN);
+            else
+                lv_obj_add_flag(ui.heat_icon_flame, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (ui.dhw_icon_flame)
+        {
+            if (LastVals.flame)
+                lv_obj_clear_flag(ui.dhw_icon_flame, LV_OBJ_FLAG_HIDDEN);
+            else
+                lv_obj_add_flag(ui.dhw_icon_flame, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    if (LastVals.wifi != vars.network.connected)
+    {
+        LastVals.wifi = vars.network.connected;
+        if (ui.heat_icon_wifi)
+        {
+            if (LastVals.wifi)
+                lv_obj_set_style_text_color(ui.heat_icon_wifi, lv_color_white(), 0);
+             else
+                lv_obj_set_style_text_color(ui.heat_icon_wifi, lv_color_hex(0x808080), 0);
+         }
+        if (ui.dhw_icon_wifi)
+        {
+            if (LastVals.wifi)
+                lv_obj_set_style_text_color(ui.dhw_icon_wifi, lv_color_white(), 0);
+            else
+                lv_obj_set_style_text_color(ui.dhw_icon_wifi, lv_color_hex(0x808080), 0);
+        }
+    }
+
+    if (LastVals.mqtt != vars.mqtt.connected)
+    {
+        LastVals.mqtt = vars.mqtt.connected;
+        if (ui.heat_icon_mqtt)
+        {
+            if (LastVals.mqtt)
+                lv_obj_set_style_text_color(ui.heat_icon_mqtt, lv_color_white(), 0);
+             else
+                lv_obj_set_style_text_color(ui.heat_icon_mqtt, lv_color_hex(0x808080), 0);
+         }
+        if (ui.dhw_icon_mqtt)
+        {
+            if (LastVals.mqtt)
+                lv_obj_set_style_text_color(ui.dhw_icon_mqtt, lv_color_white(), 0);
+            else
+                lv_obj_set_style_text_color(ui.dhw_icon_mqtt, lv_color_hex(0x808080), 0);
+        }
+    }
+
+    if (LastVals.opentherm != vars.slave.connected)
+    {
+        LastVals.opentherm = vars.slave.connected;
+        if (ui.heat_icon_opentherm)
+        {
+            if (LastVals.opentherm)
+                lv_obj_set_style_text_color(ui.heat_icon_opentherm, lv_color_white(), 0);
+             else
+                lv_obj_set_style_text_color(ui.heat_icon_opentherm, lv_color_hex(0x808080), 0);
+         }
+        if (ui.dhw_icon_opentherm)
+        {
+            if (LastVals.opentherm)
+                lv_obj_set_style_text_color(ui.dhw_icon_opentherm, lv_color_white(), 0);
+            else
+                lv_obj_set_style_text_color(ui.dhw_icon_opentherm, lv_color_hex(0x808080), 0);
+        }
+    }
+
+    time_t now = time(nullptr);
+    if (now > 100000)
+    {
+        struct tm timeinfo;
+        if (localtime_r(&now, &timeinfo))
+        {
+            if (LastVals.last_minute != timeinfo.tm_min)
             {
-                if (LastVals.last_minute != timeinfo.tm_min)
-                {
-                    LastVals.last_minute = timeinfo.tm_min;
-                    char buf[6];
-                    snprintf(buf, sizeof(buf), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+                LastVals.last_minute = timeinfo.tm_min;
+                char buf[6];
+                snprintf(buf, sizeof(buf), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+                if (ui.heat_time)
+                    lv_label_set_text(ui.heat_time, buf);
+                if (ui.dhw_time)
                     lv_label_set_text(ui.dhw_time, buf);
-                }
             }
         }
     }
@@ -786,12 +1231,18 @@ protected:
 #endif
 
 private:
-    const UBaseType_t ACTIVE_PRIORITY = 4;
+    const UBaseType_t ACTIVE_PRIORITY = 5;
     const UBaseType_t SLEEP_PRIORITY  = 1;
 
     void setup() override
     {
         settings.display.enabled = true;
+        vTaskDelay(pdMS_TO_TICKS(settings.display.splash_time_ms)); 
+        createDashboardUI();
+        lv_refr_now(NULL);
+        display.last_touch = millis();
+        touch.blocked = false;
+        touch.wait_release = true;        
     }
 
     void loop() override
@@ -807,14 +1258,16 @@ private:
         if (current_touch)
         {
             touch.x = gt911->points[0].x;
-        touch.y = gt911->points[0].y;
+            touch.y = gt911->points[0].y;
         }
         touch.pressed = current_touch;
         if (current_touch && !touch.last_state)
         {
-            if (!display.on) {
+            if (!display.on) 
+            {
                 displayOn();
                 setActivePriority();
+                touch.wait_release = true;
             }
             display.last_touch = millis();
         }
@@ -830,6 +1283,16 @@ private:
             }
         }
 #endif
+
+        if ((millis() - display.last_save) > settings.display.save_time_ms)
+        {
+                display.last_save = millis();
+                if (display.to_save)
+                {
+                    fsSettings.update();
+                    display.to_save = false;
+                }
+        }
 
         if (display.on && (millis() - display.last_touch > settings.display.timeout_ms))
         {

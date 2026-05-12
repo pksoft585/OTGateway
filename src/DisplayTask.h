@@ -19,7 +19,14 @@ LV_IMG_DECLARE(ot_icon_boot);
 #define DISP_HSYNC 5
 #define DISP_VSYNC 4
 #define DISP_PCLK 21
-#define DISP_BACKLIGHT 46
+// Backlight
+#define BACKLIGHT_PIN     46
+#define BACKLIGHT_FREQ    5000
+#define BACKLIGHT_RES     8
+#define BACKLIGHT_MIN     155
+#define BACKLIGHT_MAX     255
+#define BACKLIGHT_GAMMA   2.2f
+#define BACKLIGHT_DEFAULT 85
 
 // Data pins (RGB565, 16 bits)
 #define DISP_R1 39
@@ -127,6 +134,7 @@ struct
     lv_obj_t *root = nullptr;
     lv_obj_t *page_heat = nullptr;
     lv_obj_t *page_dhw = nullptr;
+    lv_obj_t *page_display = nullptr;
 
     // ===== COMMON =====
     lv_obj_t *heat_icon_flame = nullptr;
@@ -141,9 +149,13 @@ struct
     lv_obj_t *dhw_icon_mqtt = nullptr;
     lv_obj_t *dhw_time = nullptr;
 
+    lv_obj_t *display_icon_wifi = nullptr;
+    lv_obj_t *display_icon_opentherm = nullptr;
+    lv_obj_t *display_icon_mqtt = nullptr;
+    lv_obj_t *display_time = nullptr;
+
     // ===== HEATING PAGE =====
     lv_obj_t *heat_arc = nullptr;
-    lv_obj_t *heat_title = nullptr;
     lv_obj_t *heat_setpoint = nullptr;
     lv_obj_t *heat_current = nullptr;
     lv_obj_t *heat_action = nullptr;
@@ -154,13 +166,21 @@ struct
 
     // ===== DHW PAGE =====
     lv_obj_t *dhw_arc = nullptr;
-    lv_obj_t *dhw_title = nullptr;
     lv_obj_t *dhw_setpoint = nullptr;
     lv_obj_t *dhw_current = nullptr;
     lv_obj_t *dhw_action = nullptr;
     lv_obj_t *dhw_btn_on = nullptr;
     lv_obj_t *dhw_btn_prev = nullptr;
     lv_obj_t *dhw_btn_next = nullptr;
+
+    // ===== DISPLAY PAGE =====
+    lv_obj_t *display_arc = nullptr;
+    lv_obj_t *display_setpoint = nullptr;
+    lv_obj_t *display_current = nullptr;
+    lv_obj_t *display_action = nullptr;
+    lv_obj_t *display_btn_prev = nullptr;
+    lv_obj_t *display_btn_next = nullptr;
+    lv_obj_t *display_slider = nullptr;
 } ui;
 
 // Last values for display update optimization
@@ -179,11 +199,13 @@ struct
     int dhw_maxTemp = -1;
     bool dhw_enabled = false;
     bool dhw_active = false;
-    int last_minute = -1;
+    int display_brightness = -1;
+    int display_timeout = -1;
     bool flame = false;
     bool wifi = false;
     bool opentherm = false;
     bool mqtt = false;
+    int last_minute = -1;
 } LastVals;
 
 struct
@@ -229,12 +251,21 @@ static void show_heat_page()
 {
     lv_obj_clear_flag(ui.page_heat, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ui.page_dhw, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui.page_display, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void show_dhw_page()
 {
     lv_obj_clear_flag(ui.page_dhw, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ui.page_heat, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui.page_display, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void show_display_page()
+{
+    lv_obj_clear_flag(ui.page_display, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui.page_heat, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui.page_dhw, LV_OBJ_FLAG_HIDDEN);
 }
 
 // Event callbacks
@@ -256,19 +287,40 @@ static void dhw_enable_cb(lv_event_t *e)
     display.to_save = true;
 }
 
+static void display_timeout_cb(lv_event_t *e)
+{
+    settings.display.timeout_ms = lv_slider_get_value((lv_obj_t *)lv_event_get_target(e)) * 1000;
+    display.to_save = true;
+}
+
+// Backlight functions
+void initBacklight()
+{
+    ledcAttach(BACKLIGHT_PIN, BACKLIGHT_FREQ, BACKLIGHT_RES);
+    ledcWrite(BACKLIGHT_PIN, 0);
+}
+
+void setBacklight(uint8_t brightness)
+{
+    if (brightness > 100) brightness = 100;
+    float normalized = brightness / 100.0f;
+    float gamma = powf(normalized, BACKLIGHT_GAMMA);
+    float range = BACKLIGHT_MAX - BACKLIGHT_MIN;
+    uint8_t output = (uint8_t)(BACKLIGHT_MIN + gamma * range + 0.5f);
+    ledcWrite(BACKLIGHT_PIN, output);
+}
+
 // Display functions
 void displayOn()
 {
     display.on = true;
-    pinMode(DISP_BACKLIGHT, OUTPUT);
-    digitalWrite(DISP_BACKLIGHT, HIGH);
+    setBacklight(settings.display.brightness);
 }
 
 void displayOff()
 {
     display.on = false;
-    pinMode(DISP_BACKLIGHT, OUTPUT);
-    digitalWrite(DISP_BACKLIGHT, LOW);
+    ledcWrite(BACKLIGHT_PIN, 0); //Backlight off
 }
 
 // Display initialization
@@ -349,10 +401,12 @@ DisplayInitResult display_init()
     }
 #endif
 
+    initBacklight();
     createBootScreen();
     lv_refr_now(NULL);
     delay(DISPLAYTASK_INTERVAL * 2);
-    displayOn();
+    display.on = true;
+    setBacklight(BACKLIGHT_DEFAULT);
 
     return DisplayInitResult::OK;
 }
@@ -602,7 +656,31 @@ void createDashboardUI()
     lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, 0);
     lv_obj_center(lbl);
 
-    // NEXT, PREV PAGE
+    // PREV, NEXT PAGE
+    ui.heat_btn_prev = lv_button_create(ui.page_heat);
+
+    lv_obj_set_size(ui.heat_btn_prev, 54, 54);
+    lv_obj_align(ui.heat_btn_prev, LV_ALIGN_BOTTOM_LEFT, 1, -5);
+
+    lv_obj_set_style_bg_opa(ui.heat_btn_prev, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ui.heat_btn_prev, 2, 0);
+    lv_obj_set_style_border_color(ui.heat_btn_prev, lv_color_hex(0x808080), 0);
+    lv_obj_set_style_radius(ui.heat_btn_prev, 27, 0);
+
+    lv_obj_add_event_cb(
+        ui.heat_btn_prev,
+        [](lv_event_t *e)
+        {
+            show_display_page();
+        },
+        LV_EVENT_CLICKED,
+        NULL);
+
+    lbl = lv_label_create(ui.heat_btn_prev);
+    lv_label_set_text(lbl, LV_SYMBOL_LEFT);
+    lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
+    lv_obj_center(lbl);
+
     ui.heat_btn_next = lv_button_create(ui.page_heat);
 
     lv_obj_set_size(ui.heat_btn_next, 54, 54);
@@ -624,30 +702,6 @@ void createDashboardUI()
 
     lbl = lv_label_create(ui.heat_btn_next);
     lv_label_set_text(lbl, LV_SYMBOL_RIGHT);
-    lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
-    lv_obj_center(lbl);
-
-    ui.heat_btn_prev = lv_button_create(ui.page_heat);
-
-    lv_obj_set_size(ui.heat_btn_prev, 54, 54);
-    lv_obj_align(ui.heat_btn_prev, LV_ALIGN_BOTTOM_LEFT, 1, -5);
-
-    lv_obj_set_style_bg_opa(ui.heat_btn_prev, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(ui.heat_btn_prev, 2, 0);
-    lv_obj_set_style_border_color(ui.heat_btn_prev, lv_color_hex(0x808080), 0);
-    lv_obj_set_style_radius(ui.heat_btn_prev, 27, 0);
-
-    lv_obj_add_event_cb(
-        ui.heat_btn_prev,
-        [](lv_event_t *e)
-        {
-            show_dhw_page();
-        },
-        LV_EVENT_CLICKED,
-        NULL);
-
-    lbl = lv_label_create(ui.heat_btn_prev);
-    lv_label_set_text(lbl, LV_SYMBOL_LEFT);
     lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
     lv_obj_center(lbl);
 
@@ -803,7 +857,7 @@ void createDashboardUI()
         ui.dhw_btn_next,
         [](lv_event_t *e)
         {
-            show_heat_page();
+            show_display_page();
         },
         LV_EVENT_CLICKED,
         NULL);
@@ -812,6 +866,153 @@ void createDashboardUI()
     lv_label_set_text(lbl, LV_SYMBOL_RIGHT);
     lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
     lv_obj_center(lbl);
+
+    // =====================================================
+    // DISPLAY PAGE
+    // =====================================================
+    ui.page_display = lv_obj_create(ui.root);
+
+    lv_obj_set_size(ui.page_display, DISP_WIDTH, DISP_HEIGHT);
+    lv_obj_set_pos(ui.page_display, 0, 0);
+
+    lv_obj_clear_flag(ui.page_display, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(ui.page_display, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+
+    lv_obj_set_style_border_width(ui.page_display, 0, 0);
+    lv_obj_set_style_radius(ui.page_display, 0, 0);
+    lv_obj_set_style_bg_color(ui.page_display, lv_color_black(), 0);
+
+    // Hidden by default
+    lv_obj_add_flag(ui.page_display, LV_OBJ_FLAG_HIDDEN);
+
+    // ---- WIFI icon ----
+    ui.display_icon_wifi = lv_label_create(ui.page_display);
+    lv_label_set_text(ui.display_icon_wifi, LV_SYMBOL_WIFI);
+    lv_obj_set_style_text_font(ui.display_icon_wifi, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(ui.display_icon_wifi, lv_color_hex(0x808080), 0);
+    lv_obj_align(ui.display_icon_wifi, LV_ALIGN_TOP_RIGHT, -9, 4);
+
+    // ---- OT icon ----
+    ui.display_icon_opentherm = lv_label_create(ui.page_display);
+    lv_label_set_text(ui.display_icon_opentherm, "O");
+    lv_obj_set_style_text_font(ui.display_icon_opentherm, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(ui.display_icon_opentherm, lv_color_hex(0x808080), 0);
+    lv_obj_align(ui.display_icon_opentherm, LV_ALIGN_TOP_RIGHT, -37, 4);
+
+    // ---- MQTT icon ----
+    ui.display_icon_mqtt = lv_label_create(ui.page_display);
+    lv_label_set_text(ui.display_icon_mqtt, "M");
+    lv_obj_set_style_text_font(ui.display_icon_mqtt, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(ui.display_icon_mqtt, lv_color_hex(0x808080), 0);
+    lv_obj_align(ui.display_icon_mqtt, LV_ALIGN_TOP_RIGHT, -57, 4);
+
+    // ---- Time ----
+    ui.display_time = lv_label_create(ui.page_display);
+    lv_label_set_text(ui.display_time, "--:--");
+    lv_obj_set_style_text_font(ui.display_time, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(ui.display_time, lv_color_white(), 0);
+    lv_obj_align(ui.display_time, LV_ALIGN_TOP_LEFT, 5, 5);
+
+    // ---- ARC ----
+    ui.display_arc = lv_arc_create(ui.page_display);
+
+    lv_obj_set_size(ui.display_arc, 420, 420);
+    lv_obj_align(ui.display_arc, LV_ALIGN_CENTER, 0, -20);
+
+    lv_arc_set_range(ui.display_arc, 0, 100);
+    lv_arc_set_bg_angles(ui.display_arc, 135, 45);
+    lv_arc_set_value(ui.display_arc, settings.dhw.target);
+
+    lv_obj_set_style_arc_width(ui.display_arc, 24, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(ui.display_arc, lv_color_hex(0x292929), LV_PART_MAIN);
+
+    lv_obj_set_style_arc_width(ui.display_arc, 24, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(ui.display_arc, lv_color_hex(0x1B5E20), LV_PART_INDICATOR);
+
+    lv_obj_set_style_bg_color(ui.display_arc, lv_color_white(), LV_PART_KNOB);
+
+    // ---- LABELS ----
+    ui.display_action = lv_label_create(ui.page_display);
+    lv_label_set_text(ui.display_action, "Brightness");
+    lv_obj_set_style_text_font(ui.display_action, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(ui.display_action, lv_color_hex(0x1B5E20), 0);
+    lv_obj_align(ui.display_action, LV_ALIGN_CENTER, 0, -120);
+
+    ui.display_setpoint = lv_label_create(ui.page_display);
+    lv_label_set_text(ui.display_setpoint, "0%");
+    lv_obj_set_style_text_font(ui.display_setpoint, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_color(ui.display_setpoint, lv_color_white(), 0);
+    lv_obj_align(ui.display_setpoint, LV_ALIGN_CENTER, 0, -20);
+
+    ui.display_current = lv_label_create(ui.page_display);
+    lv_label_set_text(ui.display_current, "Timeout: -s");
+    lv_obj_set_style_text_font(ui.display_current, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(ui.display_current, lv_color_hex(0x1B5E20), 0);
+    lv_obj_align(ui.display_current, LV_ALIGN_CENTER, 0, 60);
+
+    // ---- BUTTONS ----
+    // PREV, NEXT PAGE
+    ui.display_btn_prev = lv_button_create(ui.page_display);
+
+    lv_obj_set_size(ui.display_btn_prev, 54, 54);
+    lv_obj_align(ui.display_btn_prev, LV_ALIGN_BOTTOM_LEFT, 1, -5);
+
+    lv_obj_set_style_bg_opa(ui.display_btn_prev, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ui.display_btn_prev, 2, 0);
+    lv_obj_set_style_border_color(ui.display_btn_prev, lv_color_hex(0x808080), 0);
+    lv_obj_set_style_radius(ui.display_btn_prev, 27, 0);
+
+    lv_obj_add_event_cb(
+        ui.display_btn_prev,
+        [](lv_event_t *e)
+        {
+            show_dhw_page();
+        },
+        LV_EVENT_CLICKED,
+        NULL);
+
+    lbl = lv_label_create(ui.display_btn_prev);
+    lv_label_set_text(lbl, LV_SYMBOL_LEFT);
+    lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
+    lv_obj_center(lbl);
+
+    ui.display_btn_next = lv_button_create(ui.page_display);
+
+    lv_obj_set_size(ui.display_btn_next, 54, 54);
+    lv_obj_align(ui.display_btn_next, LV_ALIGN_BOTTOM_RIGHT, -1, -5);
+
+    lv_obj_set_style_bg_opa(ui.display_btn_next, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ui.display_btn_next, 2, 0);
+    lv_obj_set_style_border_color(ui.display_btn_next, lv_color_hex(0x808080), 0);
+    lv_obj_set_style_radius(ui.display_btn_next, 27, 0);
+
+    lv_obj_add_event_cb(
+        ui.display_btn_next,
+        [](lv_event_t *e)
+        {
+            show_heat_page();
+        },
+        LV_EVENT_CLICKED,
+        NULL);
+
+    lbl = lv_label_create(ui.display_btn_next);
+    lv_label_set_text(lbl, LV_SYMBOL_RIGHT);
+    lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
+    lv_obj_center(lbl);
+
+    // TIMEOUT SLIDER
+    ui.display_slider  = lv_slider_create(ui.page_display);
+
+    lv_obj_set_size(ui.display_slider, 220, 12);
+    lv_obj_align(ui.display_slider, LV_ALIGN_BOTTOM_MID, 0, -35);
+
+    lv_slider_set_range(ui.display_slider, 0, 120);
+
+    lv_obj_set_style_bg_color(ui.display_slider, lv_color_hex(0x404040), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(ui.display_slider, lv_color_hex(0x1B5E20), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(ui.display_slider, lv_color_white(), LV_PART_KNOB);
+
+    lv_obj_add_event_cb(ui.display_slider, display_timeout_cb, LV_EVENT_VALUE_CHANGED, nullptr);
 
     // =====================================================
     // ARC EVENTS
@@ -878,11 +1079,44 @@ void createDashboardUI()
         LV_EVENT_RELEASED,
         NULL);
 
+    lv_obj_add_event_cb(
+        ui.display_arc,
+        [](lv_event_t *e)
+        {
+            lv_obj_t *arc = (lv_obj_t *)lv_event_get_target(e);
+
+            int value = lv_arc_get_value(arc);
+
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%d%%", value);
+
+            lv_label_set_text(ui.display_setpoint, buf);
+        },
+        LV_EVENT_VALUE_CHANGED,
+        NULL);
+
+    lv_obj_add_event_cb(
+        ui.display_arc,
+        [](lv_event_t *e)
+        {
+            lv_obj_t *arc = (lv_obj_t *)lv_event_get_target(e);
+
+            int value = lv_arc_get_value(arc);
+
+            settings.display.brightness = value;
+            setBacklight(settings.display.brightness);
+            display.to_save = true;
+        },
+        LV_EVENT_RELEASED,
+        NULL);
+
     // =====================================================
     // INITIAL VALUES
     // =====================================================
     lv_arc_set_value(ui.heat_arc, (int)(settings.heating.target * 10.0f));
     lv_arc_set_value(ui.dhw_arc, (int)(settings.dhw.target));
+    lv_arc_set_value(ui.display_arc, settings.display.brightness);
+    lv_slider_set_value(ui.display_slider, int(settings.display.timeout_ms / 1000), LV_ANIM_OFF);
 
     LastVals.heating_enabled = settings.heating.enabled;
     if (ui.heat_btn_on)
@@ -1016,7 +1250,7 @@ void updateDashboardUI()
             LastVals.heating_active = vars.slave.heating.active;
             if (vars.slave.heating.active)
             {
-                lv_label_set_text(ui.heat_action, S_HEATING);
+                lv_label_set_text(ui.heat_action, "heating");
             }
             else
             {
@@ -1086,7 +1320,7 @@ void updateDashboardUI()
             LastVals.dhw_active = vars.slave.dhw.active;
             if (vars.slave.dhw.active)
             {
-                lv_label_set_text(ui.dhw_action, S_HEATING);
+                lv_label_set_text(ui.dhw_action, "heating");
             }
             else
             {
@@ -1095,6 +1329,44 @@ void updateDashboardUI()
         }
     }
 
+    // Update display section
+    if (ui.display_setpoint)
+    {
+        if (LastVals.display_brightness != settings.display.brightness)
+        {
+            LastVals.display_brightness = settings.display.brightness;
+            lv_label_set_text_fmt(ui.display_setpoint, "%d%%", LastVals.display_brightness);
+            if (ui.display_arc)
+            {
+                lv_arc_set_value(ui.display_arc, LastVals.display_brightness);
+            }
+            setBacklight(settings.display.brightness);
+        }
+    }
+
+    int timeout_sec = settings.display.timeout_ms / 1000;
+    if (LastVals.display_timeout != timeout_sec)
+    {
+        LastVals.display_timeout = timeout_sec;
+        if (ui.display_current)
+        {
+            lv_label_set_text_fmt(ui.display_current, "Timeout: %ds", timeout_sec);
+        }
+        if (ui.display_slider)
+        {
+            lv_slider_set_value(ui.display_slider, timeout_sec, LV_ANIM_OFF);
+        }
+        if (settings.display.timeout_ms == 0)
+        {
+            lv_obj_set_style_text_color(ui.display_current, lv_color_hex(0x808080), 0);
+        }     
+        else
+        {
+            lv_obj_set_style_text_color(ui.display_current, lv_color_hex(0x1B5E20), 0);
+        }
+    }
+
+    // Update common section
     if (LastVals.flame != vars.slave.flame)
     {
         LastVals.flame = vars.slave.flame;
@@ -1131,6 +1403,13 @@ void updateDashboardUI()
             else
                 lv_obj_set_style_text_color(ui.dhw_icon_wifi, lv_color_hex(0x808080), 0);
         }
+        if (ui.display_icon_wifi)
+        {
+            if (LastVals.wifi)
+                lv_obj_set_style_text_color(ui.display_icon_wifi, lv_color_white(), 0);
+            else
+                lv_obj_set_style_text_color(ui.display_icon_wifi, lv_color_hex(0x808080), 0);
+        }
     }
 
     if (LastVals.mqtt != vars.mqtt.connected)
@@ -1149,6 +1428,13 @@ void updateDashboardUI()
                 lv_obj_set_style_text_color(ui.dhw_icon_mqtt, lv_color_white(), 0);
             else
                 lv_obj_set_style_text_color(ui.dhw_icon_mqtt, lv_color_hex(0x808080), 0);
+        }
+        if (ui.display_icon_mqtt)
+        {
+            if (LastVals.mqtt)
+                lv_obj_set_style_text_color(ui.display_icon_mqtt, lv_color_white(), 0);
+            else
+                lv_obj_set_style_text_color(ui.display_icon_mqtt, lv_color_hex(0x808080), 0);
         }
     }
 
@@ -1169,6 +1455,13 @@ void updateDashboardUI()
             else
                 lv_obj_set_style_text_color(ui.dhw_icon_opentherm, lv_color_hex(0x808080), 0);
         }
+        if (ui.display_icon_opentherm)
+        {
+            if (LastVals.opentherm)
+                lv_obj_set_style_text_color(ui.display_icon_opentherm, lv_color_white(), 0);
+            else
+                lv_obj_set_style_text_color(ui.display_icon_opentherm, lv_color_hex(0x808080), 0);
+        }
     }
 
     time_t now = time(nullptr);
@@ -1186,6 +1479,8 @@ void updateDashboardUI()
                     lv_label_set_text(ui.heat_time, buf);
                 if (ui.dhw_time)
                     lv_label_set_text(ui.dhw_time, buf);
+                if (ui.display_time)
+                    lv_label_set_text(ui.display_time, buf);
             }
         }
     }
@@ -1265,6 +1560,10 @@ private:
         {
             if (!display.on) 
             {
+                if (!lv_obj_has_flag(ui.page_display, LV_OBJ_FLAG_HIDDEN))
+                {
+                    show_heat_page();
+                }
                 displayOn();
                 setActivePriority();
                 touch.wait_release = true;
@@ -1294,10 +1593,13 @@ private:
                 }
         }
 
-        if (display.on && (millis() - display.last_touch > settings.display.timeout_ms))
+        if (!(settings.display.timeout_ms == 0))
         {
-            displayOff();
-            setSleepPriority();
+            if (display.on && (millis() - display.last_touch > settings.display.timeout_ms))
+            {
+                displayOff();
+                setSleepPriority();
+            }
         }
 
         if (!display.on) return;

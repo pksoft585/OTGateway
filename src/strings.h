@@ -24,9 +24,11 @@ const char L_OT_CH2[]                               PROGMEM = "OT.CH2";
 const char L_SENSORS[]                              PROGMEM = "SENSORS";
 const char L_SENSORS_SETTINGS[]                     PROGMEM = "SENSORS.SETTINGS";
 const char L_SENSORS_DALLAS[]                       PROGMEM = "SENSORS.DALLAS";
+
 #if defined(USE_AHT20)
 const char L_SENSORS_AHT20[]                        PROGMEM = "SENSORS.AHT20";
 #endif
+
 const char L_SENSORS_NTC[]                          PROGMEM = "SENSORS.NTC";
 const char L_SENSORS_BLE[]                          PROGMEM = "SENSORS.BLE";
 const char L_REGULATOR[]                            PROGMEM = "REGULATOR";
@@ -223,3 +225,10 @@ const char S_USE_DHCP[]                             PROGMEM = "useDhcp";
 const char S_USER[]                                 PROGMEM = "user";
 const char S_VALUE[]                                PROGMEM = "value";
 const char S_VERSION[]                              PROGMEM = "version";
+
+#if defined(DISPLAY_ENABLED)
+const char S_DISPLAY[]                              PROGMEM = "display";
+const char S_BRIGHTNESS[]                           PROGMEM = "brightness";
+const char S_TIMEOUT_MS[]                           PROGMEM = "timeout_ms";
+const char S_LANGUAGE[]                             PROGMEM = "language";
+#endif

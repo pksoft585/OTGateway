@@ -18,14 +18,13 @@
 #define LV_LOG_LEVEL             LV_LOG_LEVEL_WARN
 
 /* Fonts */
-#define LV_FONT_MONTSERRAT_14    1
 #define LV_FONT_MONTSERRAT_18    1
 #define LV_FONT_MONTSERRAT_20    1
 #define LV_FONT_MONTSERRAT_24    1
 #define LV_FONT_MONTSERRAT_36    1
 #define LV_FONT_MONTSERRAT_48    1
 #define LV_USE_FONT_SUBPX        0
-#define LV_USE_FONT_COMPRESSED   0
+#define LV_USE_FONT_COMPRESSED   1
 
 /* Performance */
 #define LV_USE_DRAW_SW           1

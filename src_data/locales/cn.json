@@ -292,7 +292,8 @@
         "ot": "OpenTherm协议设置",
         "mqtt": "MQTT 服务器设置",
         "extPump": "外置循环泵设置",
-        "cascadeControl": "Cascade 级联控制设置"
+        "cascadeControl": "Cascade 级联控制设置",
+        "display": "显示设置"
       },
 
       "enable": "启用",
@@ -492,6 +493,31 @@
         "postCirculationTime": "后循环时间 <small>(分钟)</small>",
         "antiStuckInterval": "防卡死间隔时间<small>(天)</small>",
         "antiStuckTime": "防卡死运行时长<small>(分钟)</small>"
+      },
+
+      "display": {
+        "brightness": {
+          "title": "亮度",
+          "note": "0 - 100 %"
+        },
+        "timeout": {
+          "title": "显示超时",
+          "note": "0 = 始终开启"
+        }, 
+        "temp": {
+          "min": "最低温度",
+          "max": "最高温度"
+        },
+        "language": {
+          "title": "显示语言",
+          "en": "英语",
+          "cn": "中文",
+          "it": "意大利语",
+          "nl": "荷兰语",
+          "ru": "俄语",
+          "cz": "捷克语",
+          "sk": "斯洛伐克语"
+        }
       },
 
       "cascadeControl": {

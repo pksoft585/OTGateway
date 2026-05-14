@@ -293,7 +293,8 @@
         "ot": "OpenTherm settings",
         "mqtt": "MQTT settings",
         "extPump": "External pump settings",
-        "cascadeControl": "Cascade control settings"
+        "cascadeControl": "Cascade control settings",
+        "display": "Display settings"
       },
 
       "enable": "Enable",
@@ -493,6 +494,31 @@
         "postCirculationTime": "Post circulation time <small>(min)</small>",
         "antiStuckInterval": "Anti stuck interval <small>(days)</small>",
         "antiStuckTime": "Anti stuck time <small>(min)</small>"
+      },
+
+      "display": {
+        "brightness": {
+          "title": "Brightness",
+          "note": "0 - 100 %"
+        },
+        "timeout": {
+          "title": "Display timeout",
+          "note": "0 = always on"
+        }, 
+        "temp": {
+          "min": "Minimum temperature",
+          "max": "Maximum temperature"
+        },
+        "language": {
+          "title": "Display language",
+          "en": "English",
+          "cn": "Chinese",
+          "it": "Italian",
+          "nl": "Dutch",
+          "ru": "Russian",
+          "cz": "Czech",
+          "sk": "Slovak"
+        }
       },
 
       "cascadeControl": {

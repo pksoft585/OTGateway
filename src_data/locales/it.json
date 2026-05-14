@@ -292,7 +292,8 @@
         "ot": "Impostazioni OpenTherm",
         "mqtt": "Impostazioni MQTT",
         "extPump": "Impostazioni pompa esterna",
-        "cascadeControl": "Impostazioni controllo a cascata"
+        "cascadeControl": "Impostazioni controllo a cascata",
+        "display": "Impostazioni display"
       },
 
       "enable": "Attiva",
@@ -494,6 +495,31 @@
         "antiStuckTime": "Tempo antiblocco <small>(min)</small>"
       },
 
+      "display": {
+        "brightness": {
+          "title": "Luminosità",
+          "note": "0 - 100 %"
+        },
+        "timeout": {
+          "title": "Tempo di inattività del display",
+          "note": "0 = sempre acceso"
+        }, 
+        "temp": {
+          "min": "Temperatura minima",
+          "max": "Temperatura massima"
+        },
+        "language": {
+          "title": "Lingua del display",
+          "en": "Inglese",
+          "cn": "Cinese",
+          "it": "Italiano",
+          "nl": "Olandese",
+          "ru": "Russo",
+          "cz": "Ceco",
+          "sk": "Slovacco"        
+        }
+      },
+
       "cascadeControl": {
         "input": {
           "desc": "Può essere attivata la caldaia se un'altra ha fallito. Il controllo dell'altra caldaia cambia lo stato dell'ingresso del GPIO in caso di errore.",
@@ -506,7 +532,7 @@
           "desc": "Può essere usato per passare ad un'altra caldaia tramite <u>relè</u>.",
           "enable": "Uscita abilitata",
           "gpio": "GPIO",
-          "invertState": "Invert GPIO state",
+          "invertState": "Inverti stato GPIO",
           "thresholdTime": "Tempo soglia di modifica dello stato <small>(sec)</small>",
           "events": {
             "desc": "Eventi",

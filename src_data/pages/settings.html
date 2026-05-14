@@ -25,6 +25,8 @@
               <option value="it">IT</option>
               <option value="nl">NL</option>
               <option value="ru">RU</option>
+              <option value="cz">CZ</option>
+              <option value="sk">SK</option>
             </select>
           </li>
         </ul>
@@ -908,6 +910,84 @@
             </form>
           </div>
         </details>
+
+        <div id="display-settings-section" class="hidden">
+            
+          <hr />
+
+          <details>
+            <summary><b data-i18n>settings.section.display</b></summary>
+            <div>
+              <div id="display-settings-busy" aria-busy="true"></div>
+              <form action="/api/settings" id="display-settings" class="hidden">
+                <div class="grid">
+                  <label>
+                    <span data-i18n>settings.display.temp.min</span>
+                    <input type="number" inputmode="numeric" name="display[minTemp]" min="0" max="29" step="1" required>
+                  </label>
+
+                  <label>
+                    <span data-i18n>settings.display.temp.max</span>
+                    <input type="number" inputmode="numeric" name="display[maxTemp]" min="30" max="90" step="1" required>
+                  </label>
+                </div>
+                <div class="grid">
+                  <label>
+                    <span data-i18n>settings.display.brightness.title</span>
+                    <input type="number" inputmode="numeric" name="display[brightness]" min="0" max="100" step="1" required>
+                    <small data-i18n>settings.display.brightness.note</small>
+                  </label>
+
+                  <label>
+                    <span data-i18n>settings.display.timeout.title</span>
+                    <input type="number" inputmode="numeric" name="display[timeout_ms]" min="0" max="120" step="1" required>
+                    <small data-i18n>settings.display.timeout.note</small>
+                  </label>
+                </div>
+
+                <fieldset>
+                  <legend data-i18n>settings.display.language.title</legend>
+                  <label>
+                    <input type="radio" name="display[language]" value="0" />
+                    <span data-i18n>settings.display.language.en</span>
+                  </label>
+
+                  <label>
+                    <input type="radio" name="display[language]" value="1" />
+                    <span data-i18n>settings.display.language.cn</span>
+                  </label>
+
+                  <label>
+                    <input type="radio" name="display[language]" value="2" />
+                    <span data-i18n>settings.display.language.it</span>
+                  </label>
+
+                  <label>
+                    <input type="radio" name="display[language]" value="3" />
+                    <span data-i18n>settings.display.language.nl</span>
+                  </label>
+
+                  <label>
+                    <input type="radio" name="display[language]" value="4" />
+                    <span data-i18n>settings.display.language.ru</span>
+                  </label>
+
+                  <label>
+                    <input type="radio" name="display[language]" value="5" />
+                    <span data-i18n>settings.display.language.cz</span>
+                  </label>
+
+                  <label>
+                    <input type="radio" name="display[language]" value="6" />
+                    <span data-i18n>settings.display.language.sk</span>
+                  </label>
+                </fieldset>
+
+                <button type="submit" data-i18n>button.save</button>
+              </form>
+            </div>
+          </div>
+        </details>
       </article>
     </main>
 
@@ -1164,6 +1244,14 @@
           setCheckboxValue("[name='cascadeControl[output][onEnabledHeating]']", data.cascadeControl.output.onEnabledHeating);
           setBusy('#cc-settings-busy', '#cc-settings', false);
 
+          // Display
+          setInputValue("[name='display[brightness]']", data.display.brightness);
+          setInputValue("[name='display[timeout_ms]']", data.display.timeout_ms);
+          setRadioValue("[name='display[language]']", data.display.language);
+          setInputValue("[name='display[minTemp]']", data.display.minTemp);
+          setInputValue("[name='display[maxTemp]']", data.display.maxTemp);
+          setBusy('#display-settings-busy', '#display-settings', false);
+
           // Heating
           setInputValue("[name='heating[minTemp]']", data.heating.minTemp, {
             "min": data.system.unitSystem == 0 ? 0 : 32,
@@ -1316,6 +1404,13 @@
           const result = await response.json();
           fillData(result);
 
+          document
+            .getElementById('display-settings-section')
+            .classList.toggle(
+              'hidden',
+              !result.display.enabled
+            );
+
           setupForm('#portal-settings', fillData, ['portal.login', 'portal.password']);
           setupForm('#system-settings', fillData);
           setupForm('#heating-settings', fillData);
@@ -1327,6 +1422,7 @@
           setupForm('#mqtt-settings', fillData, ['mqtt.user', 'mqtt.password', 'mqtt.prefix']);
           setupForm('#extpump-settings', fillData);
           setupForm('#cc-settings', fillData);
+          setupForm('#display-settings', fillData);
 
         } catch (error) {
           console.log(error);

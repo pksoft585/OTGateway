@@ -269,7 +269,8 @@
         "ot": "OpenTherm-instellingen",
         "mqtt": "MQTT-instellingen",
         "extPump": "Instellingen externe pomp",
-        "cascadeControl": "Instellingen cascaderegeling"
+        "cascadeControl": "Instellingen cascaderegeling",
+        "display": "Display-instellingen"
       },
       "enable": "Inschakelen",
       "note": {
@@ -457,6 +458,30 @@
         "postCirculationTime": "Nacirculatietijd <small>(min)</small>",
         "antiStuckInterval": "Anti-vastloopinterval <small>(dagen)</small>",
         "antiStuckTime": "Anti-vastlooptijd <small>(min)</small>"
+      },
+      "display": {
+        "brightness": {
+          "title": "Luminositeit",
+          "note": "0 - 100 %"
+        },
+        "timeout": {
+          "title": "Display time-out",
+          "note": "0 = altijd aangezet"
+        }, 
+        "temp": {
+          "min": "Minimumtemperatuur",
+          "max": "Maximumtemperatuur"
+        },
+        "language": {
+          "title": "Displaytaal",
+          "en": "Engels",
+          "cn": "Chinees",
+          "it": "Italiaans",
+          "nl": "Nederlands",
+          "ru": "Russisch",
+          "cz": "Tsjechisch",
+          "sk": "Slowaaks"        
+        }
       },
       "cascadeControl": {
         "input": {

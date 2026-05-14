@@ -566,6 +566,17 @@ void settingsToJson(const Settings& src, JsonVariant dst, bool safe = false) {
     cascadeControlOutput[FPSTR(S_ON_FAULT)] = src.cascadeControl.output.onFault;
     cascadeControlOutput[FPSTR(S_ON_LOSS_CONNECTION)] = src.cascadeControl.output.onLossConnection;
     cascadeControlOutput[FPSTR(S_ON_ENABLED_HEATING)] = src.cascadeControl.output.onEnabledHeating;
+
+#if defined(DISPLAY_ENABLED)
+    auto display = dst[FPSTR(S_DISPLAY)].to<JsonObject>();
+    display[FPSTR(S_ENABLED)] = src.display.enabled;
+    display[FPSTR(S_BRIGHTNESS)] = src.display.brightness;
+    display[FPSTR(S_TIMEOUT_MS)] = src.display.timeout_ms / 1000;
+    display[FPSTR(S_MAX_TEMP)] = src.display.heating_maxTemp10 / 10;
+    display[FPSTR(S_MIN_TEMP)] = src.display.heating_minTemp10 / 10;
+    display[FPSTR(S_LANGUAGE)] = static_cast<uint8_t>(src.display.language);
+#endif
+
   }
 }
 
@@ -1517,6 +1528,60 @@ bool jsonToSettings(const JsonVariantConst src, Settings& dst, bool safe = false
 
 
   if (!safe) {
+
+#if defined(DISPLAY_ENABLED)
+    // display
+    if (!src[FPSTR(S_DISPLAY)][FPSTR(S_BRIGHTNESS)].isNull()) {
+      uint8_t value = src[FPSTR(S_DISPLAY)][FPSTR(S_BRIGHTNESS)].as<uint8_t>();
+      if (value > 100) value = 100;
+      if (value != dst.display.brightness) {
+        dst.display.brightness = value;
+        changed = true;
+      }
+    }  
+
+    if (!src[FPSTR(S_DISPLAY)][FPSTR(S_TIMEOUT_MS)].isNull()) {
+      uint32_t value = src[FPSTR(S_DISPLAY)][FPSTR(S_TIMEOUT_MS)].as<uint32_t>();
+      if (value > 120) value = 120;
+      value = value*1000;
+      if (value != dst.display.timeout_ms) {
+        dst.display.timeout_ms = value;
+        changed = true;
+      }
+    }
+
+    if (!src[FPSTR(S_DISPLAY)][FPSTR(S_MAX_TEMP)].isNull()) {
+      uint32_t value = src[FPSTR(S_DISPLAY)][FPSTR(S_MAX_TEMP)].as<uint32_t>();
+      value = constrain(value, 30, 90);
+      value *= 10;
+      if (value != dst.display.heating_maxTemp10) {
+        dst.display.heating_maxTemp10 = value;
+        changed = true;
+      }
+    }
+
+    if (!src[FPSTR(S_DISPLAY)][FPSTR(S_MIN_TEMP)].isNull()) {
+      uint32_t value = src[FPSTR(S_DISPLAY)][FPSTR(S_MIN_TEMP)].as<uint32_t>();
+      value = constrain(value, 0, 29);
+      value *= 10;
+      if (value != dst.display.heating_minTemp10) {
+        dst.display.heating_minTemp10 = value;
+        changed = true;
+      }
+    }
+
+    if (!src[FPSTR(S_DISPLAY)][FPSTR(S_LANGUAGE)].isNull()) {
+      uint8_t value = src[FPSTR(S_DISPLAY)][FPSTR(S_LANGUAGE)].as<uint8_t>();
+      if (value <= static_cast<uint8_t>(Language::SK)) {
+          auto language = static_cast<Language>(value);
+          if (language != dst.display.language) {
+              dst.display.language = language;
+              changed = true;
+          }
+      }
+    }
+#endif
+
     // external pump
     if (src[FPSTR(S_EXTERNAL_PUMP)][FPSTR(S_USE)].is<bool>()) {
       bool value = src[FPSTR(S_EXTERNAL_PUMP)][FPSTR(S_USE)].as<bool>();
@@ -1940,9 +2005,11 @@ bool jsonToSensorSettings(const uint8_t sensorId, const JsonVariantConst src, Se
       case static_cast<uint8_t>(Sensors::Type::NTC_10K_TEMP):
       case static_cast<uint8_t>(Sensors::Type::DALLAS_TEMP):
       case static_cast<uint8_t>(Sensors::Type::BLUETOOTH):
+
 #if defined(USE_AHT20)
       case static_cast<uint8_t>(Sensors::Type::AHT20):
-#endif      
+#endif
+      
       case static_cast<uint8_t>(Sensors::Type::HEATING_SETPOINT_TEMP):
       case static_cast<uint8_t>(Sensors::Type::MANUAL):
       case static_cast<uint8_t>(Sensors::Type::NOT_CONFIGURED):

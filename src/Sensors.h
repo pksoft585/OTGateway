@@ -39,6 +39,7 @@ public:
     NTC_10K_TEMP            = 50,
     DALLAS_TEMP             = 51,
     BLUETOOTH               = 52,
+
 #if defined(USE_AHT20)
     AHT20                   = 55,
 #endif

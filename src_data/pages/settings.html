@@ -1383,6 +1383,9 @@
             );
           }
 
+          const currentTimezone = document.querySelector("[name='system[ntp][timezone]']").value;
+          ptzSelector.value = currentTimezone;
+
           ptzSelector.addEventListener("change", async (event) => {
             document.querySelector("[name='system[ntp][timezone]']").value = event.target.value;
           });

@@ -115,7 +115,7 @@
         "sFaultCode": "Fault code",
         "sDiagActive": "Diagnostic",
         "sDiagCode": "Diagnostic code",
-        
+
         "mHeatEnabled": "Heating enabled",
         "mHeatBlocking": "Heating blocked",
         "mHeatOverheat": "Heating overheat",
@@ -245,7 +245,7 @@
         "otHeatingPumpHours": "OpenTherm, number of pump operating hours (heating)",
         "otDhwPumpHours": "OpenTherm, number of pump operating hours (DHW)",
         "otCoolingHours": "OpenTherm, number of cooling hours",
-        
+
         "ntcTemp": "NTC sensor",
         "dallasTemp": "DALLAS sensor",
         "bluetooth": "BLE sensor",
@@ -381,7 +381,7 @@
 
       "emergency": {
         "desc": "Emergency mode is activated automatically when «PID» or «Equitherm» cannot calculate the heat carrier setpoint:<br />- if «Equitherm» is enabled and the outdoor temperature sensor is disconnected;<br />- if «PID» or OT option <i>«Native heating control»</i> is enabled and the indoor temperature sensor is disconnected.<br /><b>Note:</b> On network fault or MQTT fault, sensors with <i>«Manual via MQTT/API»</i> type will be in DISCONNECTED state.",
-        
+
         "target": {
           "title": "Target temperature",
           "note": "<b>Important:</b> <u>Target indoor temperature</u> if OT option <i>«Native heating control»</i> is enabled.<br />In all other cases, the <u>target heat carrier temperature</u>."

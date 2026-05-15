@@ -115,10 +115,11 @@
         "sFaultCode": "报警代码",
         "sDiagActive": "诊断状态",
         "sDiagCode": "诊断代码",
-        
+
         "mHeatEnabled": "供暖功能已启用",
         "mHeatBlocking": "供暖",
         "mHeatOverheat": "供暖超热保护",
+        "mHeatFreezing": "供暖冷凍",
         "sHeatActive": "供暖激活状态",
         "mHeatSetpointTemp": "供暖供水设定温度",
         "mHeatTargetTemp": "供暖供水目标温度",
@@ -244,7 +245,7 @@
         "otHeatingPumpHours": "OpenTherm, number of pump operating hours (heating)",
         "otDhwPumpHours": "OpenTherm, number of pump operating hours (DHW)",
         "otCoolingHours": "OpenTherm, number of cooling hours",
-        
+
         "ntcTemp": "NTC 传感器",
         "dallasTemp": "DALLAS 传感器",
         "bluetooth": "BLE 传感器",
@@ -380,7 +381,7 @@
 
       "emergency": {
         "desc": "紧急模式会在以下情况自动激活（当PID或气候补偿无法计算热媒设定值时）：<br />启用气候补偿但室外温度传感器断开连接；<br />启用PID或 OpenTherm 选项中启用<i>原生供暖控制</i>但室内温度传感器断开连接。<br /><b>注意：</b> 网络故障或MQTT 服务器连接故障时，类型为<i>通过MQTT/API手动控制<i>的传感器将显示为断开连接状态。",
-        
+
         "target": {
           "title": "目标温度",
           "note": "<b>重要提示：</b> 若启用OpenTherm选项 <i>«原生供暖控制»</i>，此处设定值为<u>目标室内温度</u>；<br />其他所有情况下，此处设定值为 <u>目标热媒出水温度</u>."

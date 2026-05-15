@@ -71,6 +71,18 @@ All available information and instructions can be found in the wiki:
       * [Connection](https://github.com/Laxilef/OTGateway/wiki/OT-adapters#connection)
       * [Leds on board](https://github.com/Laxilef/OTGateway/wiki/OT-adapters#leds-on-board)
 
+
+## Version for OpenTherm Thermostat 3 HW
+This version (diyless3) is designed for specific hardware manufactured by ![diyless](/assets/diyless.png).
+
+[Device](https://diyless.com/product/opentherm-thermostat3?frame-id=opentherm-thermostat3-white&wall-id=opentherm-thermostat3-power-white) combines an ESP32-S3, an OpenTherm Gateway, an AHT20, and a 4.0-inch touchscreen display. You can find more details on the website. This thermostat comes with its own firmware, and you can also find the basic software for Esphome on [GitHub](https://github.com/diyless/esphome-opentherm-thermostat). The goal of the project is to utilize this hardware and implement OTGateway on it because OTGateway features truly sophisticated control algorithms. In addition to implementing OTGateway, basic heating and DHW control options have been added directly to the display. There are three screens: for heating, DHW, and display settings. The settings correspond to those on the basic dashboard screen on the web. The assumption is that primary settings are configured via the web. Implementing complete settings on the display is not efficient. Display settings are also implemented in the web interface, and the display supports basic localization into currently supported languages. The main advantage is that, once set up, you no longer need a smartphone, the web, or Wi-Fi for basic control. Control is local. This includes an optional temperature sensor built right into the device.
+
+Here are images of the device with the individual screens:
+
+![Heating](/assets/diy3-heat.png) 
+![DHW](/assets/diy3-dhw.png) 
+![Display](/assets/diy3-disp.png)
+
 ## Gratitude
 * To the developers of the libraries used: [OpenTherm Library](https://github.com/ihormelnyk/opentherm_library), [ESP8266Scheduler](https://github.com/nrwiersma/ESP8266Scheduler), [ArduinoJson](https://github.com/bblanchon/ArduinoJson), [NimBLE-Arduino](https://github.com/h2zero/NimBLE-Arduino), [ArduinoMqttClient](https://github.com/arduino-libraries/ArduinoMqttClient), [ESPTelnet](https://github.com/LennartHennigs/ESPTelnet), [FileData](https://github.com/GyverLibs/FileData), [GyverPID](https://github.com/GyverLibs/GyverPID), [GyverBlinker](https://github.com/GyverLibs/GyverBlinker), [OneWireNg](https://github.com/pstolarz/OneWireNg) & [OneWire](https://github.com/PaulStoffregen/OneWire)
 * To the [PlatformIO](https://platformio.org/) Team

@@ -54,9 +54,10 @@ struct Settings {
       bool enabled = false;
       uint32_t timeout_ms = 30000; 
       uint32_t save_time_ms= 3000; 
+      uint32_t collect_time_ms= 1000; 
       uint32_t splash_time_ms= 3000;
       uint8_t brightness = 85;
-      Language language = Language::CZ;
+      Language language = Language::EN;
       int heating_minTemp10 = 150;
       int heating_maxTemp10 = 300;
   } display;

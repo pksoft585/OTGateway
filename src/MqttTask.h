@@ -292,7 +292,7 @@ protected:
               this->haHelper->deleteDynamicSensor(prevSettings, Sensors::ValueType::RSSI);
               break;
 
-#if defined(USE_AHT20)
+#if defined(DISPLAY_AHT20)
               case Sensors::Type::AHT20:
               this->haHelper->deleteConnectionDynamicSensor(prevSettings);
               this->haHelper->deleteSignalQualityDynamicSensor(prevSettings);
@@ -328,7 +328,7 @@ protected:
             this->haHelper->publishDynamicSensor(sSettings, Sensors::ValueType::RSSI, settings.system.unitSystem, false);
             break;
 
-#if defined(USE_AHT20)
+#if defined(DISPLAY_AHT20)
           case Sensors::Type::AHT20:
             this->haHelper->publishConnectionDynamicSensor(sSettings);
             this->haHelper->publishSignalQualityDynamicSensor(sSettings, false);

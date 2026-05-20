@@ -402,7 +402,7 @@ protected:
     }
   }
 
-#if defined(USE_AHT20)
+#if defined(DISPLAY_AHT20)
   void pollingAhtSensors() {
     for (uint8_t sensorId = 0; sensorId <= Sensors::getMaxSensorId(); sensorId++) {
       auto& sSensor = Sensors::settings[sensorId];

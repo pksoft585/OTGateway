@@ -2006,7 +2006,7 @@ bool jsonToSensorSettings(const uint8_t sensorId, const JsonVariantConst src, Se
       case static_cast<uint8_t>(Sensors::Type::DALLAS_TEMP):
       case static_cast<uint8_t>(Sensors::Type::BLUETOOTH):
 
-#if defined(USE_AHT20)
+#if defined(DISPLAY_AHT20)
       case static_cast<uint8_t>(Sensors::Type::AHT20):
 #endif
       
@@ -2167,7 +2167,7 @@ void sensorResultToJson(const uint8_t sensorId, JsonVariant dst) {
     dst[FPSTR(S_BATTERY)] = roundf(rSensor.values[static_cast<uint8_t>(Sensors::ValueType::BATTERY)], 1);
     dst[FPSTR(S_RSSI)] = roundf(rSensor.values[static_cast<uint8_t>(Sensors::ValueType::RSSI)], 0);
 
-#if defined(USE_AHT20)
+#if defined(DISPLAY_AHT20)
   } else if (sSensor.type == Sensors::Type::AHT20) {
     dst[FPSTR(S_TEMPERATURE)] = roundf(rSensor.values[static_cast<uint8_t>(Sensors::ValueType::TEMPERATURE)], 3);
     dst[FPSTR(S_HUMIDITY)] = roundf(rSensor.values[static_cast<uint8_t>(Sensors::ValueType::HUMIDITY)], 3);

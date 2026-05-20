@@ -40,7 +40,7 @@ public:
     DALLAS_TEMP             = 51,
     BLUETOOTH               = 52,
 
-#if defined(USE_AHT20)
+#if defined(DISPLAY_AHT20)
     AHT20                   = 55,
 #endif
 
@@ -475,7 +475,7 @@ public:
 };
 
 // AHT20 sensor
-#if defined(USE_AHT20)
+#if defined(DISPLAY_AHT20)
 typedef struct {
     float temperature;
     float humidity;

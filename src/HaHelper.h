@@ -178,7 +178,7 @@ public:
 
     // set device class, name, value template for sensors
     // or name & value template for another sensors
-#if defined(USE_AHT20)
+#if defined(DISPLAY_AHT20)
     if (sSensor.type == Sensors::Type::BLUETOOTH ||
         sSensor.type == Sensors::Type::AHT20) {
 #else

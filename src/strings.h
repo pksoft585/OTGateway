@@ -25,7 +25,7 @@ const char L_SENSORS[]                              PROGMEM = "SENSORS";
 const char L_SENSORS_SETTINGS[]                     PROGMEM = "SENSORS.SETTINGS";
 const char L_SENSORS_DALLAS[]                       PROGMEM = "SENSORS.DALLAS";
 
-#if defined(USE_AHT20)
+#if defined(DISPLAY_AHT20)
 const char L_SENSORS_AHT20[]                        PROGMEM = "SENSORS.AHT20";
 #endif
 
@@ -231,4 +231,5 @@ const char S_DISPLAY[]                              PROGMEM = "display";
 const char S_BRIGHTNESS[]                           PROGMEM = "brightness";
 const char S_TIMEOUT_MS[]                           PROGMEM = "timeout_ms";
 const char S_LANGUAGE[]                             PROGMEM = "language";
+const char L_DISPLAY[]                              PROGMEM = "DISPLAY";
 #endif

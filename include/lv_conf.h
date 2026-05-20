@@ -28,7 +28,7 @@
 
 /* Performance */
 #define LV_USE_DRAW_SW           1
-#define LV_DEF_REFR_PERIOD       16
+#define LV_DEF_REFR_PERIOD       33
 #define LV_DRAW_SW_COMPLEX       1
 #define LV_DRAW_SW_SHADOW_CACHE  1
 #define LV_INDEV_DEF_READ_PERIOD 50

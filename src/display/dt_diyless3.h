@@ -10,15 +10,6 @@
 #define DISP_VSYNC 4
 #define DISP_PCLK  21
 
-// Backlight
-#define BACKLIGHT_PIN     46
-#define BACKLIGHT_FREQ    5000
-#define BACKLIGHT_RES     8
-#define BACKLIGHT_MIN     155
-#define BACKLIGHT_MAX     255
-#define BACKLIGHT_GAMMA   0.8f
-#define BACKLIGHT_DEFAULT 85
-
 // Data pins (RGB565, 16 bits)
 #define DISP_R1 39
 #define DISP_R2 40
@@ -38,25 +29,38 @@
 #define DISP_B5 8
 
 // Display sync
-#define HSYNC_POL    1
-#define HFRONT_PORCH 50
-#define HPULSE_WIDTH 10
-#define HBACK_PORCH  40
-#define VSYNC_POL    1
-#define VFRONT_PORCH 20
-#define VPULSE_WIDTH 10
-#define VBACK_PORCH  30
-#define PCLK_ACT_NEG 1
-#define PREFER_SPEED 8000000L
-#define BOUNCE       false 
+#define DISP_HSYNC_POL    1
+#define DISP_HFRONT_PORCH 50
+#define DISP_HPULSE_WIDTH 10
+#define DISP_HBACK_PORCH  40
+#define DISP_VSYNC_POL    1
+#define DISP_VFRONT_PORCH 20
+#define DISP_VPULSE_WIDTH 10
+#define DISP_VBACK_PORCH  30
+#define DISP_PCLK_ACT_NEG 1
+#define DISP_PREFER_SPEED 8000000L
+#define DISP_BOUNCE       false 
 
 // Display resolution
 #define DISP_WIDTH  480
 #define DISP_HEIGHT 480
 
-// Touch GT911
-#define TOUCH_SDA 17
-#define TOUCH_SCL 18
-#define TOUCH_INT 10
+// Display init
+#define DISP_INIT_SEQ    st7701_type1_init_operations
+
+// Backlight
+#define BACKLIGHT_PIN     46
+#define BACKLIGHT_FREQ    5000
+#define BACKLIGHT_RES     8
+#define BACKLIGHT_MIN     155
+#define BACKLIGHT_MAX     255
+#define BACKLIGHT_GAMMA   0.8f
+#define BACKLIGHT_DEFAULT 85
+
+// Touch
+#define TOUCH_TYPE_GT911
+#define TOUCH_SDA   17
+#define TOUCH_SCL   18
+#define TOUCH_INT   10
 #define TOUCH_RST GFX_NOT_DEFINED
-#define TOUCH_GT911_ROTATION ROTATION_INVERTED
+#define TOUCH_ROTATION ROTATION_INVERTED

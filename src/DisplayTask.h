@@ -681,7 +681,7 @@ void createUI()
 
     // ---- ARC ----
     ui.arc = lv_arc_create(ui.root);
-    lv_obj_set_size(ui.arc, 420, 420);
+    lv_obj_set_size(ui.arc, (DISP_WIDTH * 7) / 8, (DISP_HEIGHT * 7) / 8);
     lv_obj_align(ui.arc, LV_ALIGN_CENTER, 0, -20);
     lv_arc_set_bg_angles(ui.arc, 135, 45);
     lv_obj_set_style_arc_width(ui.arc, 24, LV_PART_MAIN);
@@ -1136,16 +1136,36 @@ private:
             return;
         }
 
-        gt911->read();
-        bool current_touch = gt911->isTouched;
-
-        if (current_touch)
+#if defined(TOUCH_TYPE_GT911)
+        touch.dev->read();
+        touch.pressed = touch.dev->isTouched;
+        if (touch.pressed)
         {
-            touch.x = gt911->points[0].x;
-            touch.y = gt911->points[0].y;
+            touch.x = touch.dev->points[0].x;
+            touch.y = touch.dev->points[0].y;
         }
-        touch.pressed = current_touch;
-        if (current_touch && !touch.last_state)
+#endif
+
+#if defined(TOUCH_TYPE_FT6X36)
+        touch.pressed = touch.dev->touched();
+        if (touch.pressed)
+            {
+                auto p = touch.dev->getPoint();
+                touch.x = p.x;
+                touch.y = p.y;
+            }
+#endif
+
+#if defined(TOUCH_TYPE_CST816)
+        touch.pressed = touch.dev->available();
+        if (touch.pressed)
+        {
+            touch.x = touch.dev->x;
+            touch.y = touch.dev->y;
+        }
+#endif
+
+        if (touch.pressed && !touch.last_state)
         {
             if (!display.on) 
             {
@@ -1163,7 +1183,7 @@ private:
             }
             display.last_touch = millis();
         }
-        touch.last_state = current_touch;
+        touch.last_state = touch.pressed;
 
 #if defined(DISPLAY_AHT20)
         if (SensorAHT20.read)

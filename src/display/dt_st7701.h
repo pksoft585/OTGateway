@@ -1,14 +1,25 @@
 #include <lvgl.h>
 #include <Arduino_GFX_Library.h>
-#include <TAMC_GT911.h>
 #include <Wire.h>
-
-#if defined(DISPLAY_AHT20)
-#include <Adafruit_AHTX0.h>
-#endif
 
 #if defined(DISPLAY_TYPE_DIYLESS3)
 #include "dt_diyless3.h"
+#endif
+
+#if defined(TOUCH_TYPE_GT911)
+#include <TAMC_GT911.h>
+#endif
+
+#if defined(TOUCH_TYPE_FT6X36)
+#include <FT6X36.h>
+#endif
+
+#if defined(TOUCH_TYPE_CST816)
+#include <cst816t.h>
+#endif
+
+#if defined(DISPLAY_AHT20)
+#include <Adafruit_AHTX0.h>
 #endif
 
 #if defined(DISPLAY_SPLASH_SCREEN)
@@ -29,6 +40,7 @@ enum class DisplayInitResult : uint8_t
     RGB_FAIL,
     GFX_ALLOC_FAIL,
     GFX_BEGIN_FAIL,
+    I2C_FAIL,
     TOUCH_FAIL,
     LV_BUF_FAIL,
     LV_DISPLAY_FAIL,
@@ -50,6 +62,8 @@ const char *displayInitResultToString(DisplayInitResult r)
         return "GFX_ALLOC_FAIL";
     case DisplayInitResult::GFX_BEGIN_FAIL:
         return "GFX_BEGIN_FAIL";
+    case DisplayInitResult::I2C_FAIL:
+        return "I2C_FAIL";
     case DisplayInitResult::TOUCH_FAIL:
         return "TOUCH_FAIL";
     case DisplayInitResult::LV_BUF_FAIL:
@@ -75,7 +89,6 @@ bool dt_aht20 = false;
 Arduino_DataBus *bus = nullptr;
 Arduino_ESP32RGBPanel *rgbpanel = nullptr;
 Arduino_RGB_Display *gfx = nullptr;
-TAMC_GT911 *gt911 = nullptr;
 lv_display_t *lv_display = nullptr;
 static lv_color_t *lv_buf1 = nullptr;
 
@@ -87,16 +100,30 @@ void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
 void my_touchpad_read(lv_indev_t *indev, lv_indev_data_t *data);
 void SplashScreen();
 
-// GT911 structure
-struct
-{
+// Touch structure
+template <typename T>
+struct TouchStructure {
     int16_t x = 0;
     int16_t y = 0;
     bool pressed = false;
     bool last_state = false;
     bool blocked = true;
     bool wait_release = false;
-} touch;
+
+    T* dev = nullptr;
+};
+
+#if defined(TOUCH_TYPE_GT911)
+    TouchStructure<TAMC_GT911> touch;
+#endif
+
+#if defined(TOUCH_TYPE_FT6X36)
+    TouchStructure<FT6X36> touch;
+#endif
+
+#if defined(TOUCH_TYPE_CST816)
+    TouchStructure<cst816t> touch;
+#endif
 
 // Backlight functions
 void initBacklight()
@@ -134,25 +161,73 @@ DisplayInitResult display_init()
         DISP_R1, DISP_R2, DISP_R3, DISP_R4, DISP_R5,
         DISP_G0, DISP_G1, DISP_G2, DISP_G3, DISP_G4, DISP_G5,
         DISP_B1, DISP_B2, DISP_B3, DISP_B4, DISP_B5,
-        HSYNC_POL, HFRONT_PORCH, HPULSE_WIDTH, HBACK_PORCH,
-        VSYNC_POL, VFRONT_PORCH, VPULSE_WIDTH, VBACK_PORCH,
-        PCLK_ACT_NEG, PREFER_SPEED, BOUNCE);
+        DISP_HSYNC_POL, DISP_HFRONT_PORCH, DISP_HPULSE_WIDTH, DISP_HBACK_PORCH,
+        DISP_VSYNC_POL, DISP_VFRONT_PORCH, DISP_VPULSE_WIDTH, DISP_VBACK_PORCH,
+        DISP_PCLK_ACT_NEG, DISP_PREFER_SPEED, DISP_BOUNCE);
     if (!rgbpanel) return DisplayInitResult::RGB_FAIL;
 
     gfx = new Arduino_RGB_Display(
         DISP_WIDTH, DISP_HEIGHT, rgbpanel, 0, true,
-        bus, DISP_RST, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
+        bus, DISP_RST, DISP_INIT_SEQ, sizeof(DISP_INIT_SEQ));
     if (!gfx) return DisplayInitResult::GFX_ALLOC_FAIL;
 
     if (!gfx->begin()) return DisplayInitResult::GFX_BEGIN_FAIL;
 
-    Wire.begin(TOUCH_SDA, TOUCH_SCL);
+    if (!Wire.begin(TOUCH_SDA, TOUCH_SCL)) return DisplayInitResult::I2C_FAIL;
 
-    gt911 = new TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, DISP_WIDTH, DISP_HEIGHT);
-    if (!gt911) return DisplayInitResult::TOUCH_FAIL;
+    uint8_t touch_addr = 0;
 
-    gt911->begin();
-    gt911->setRotation(TOUCH_GT911_ROTATION);
+#if defined(TOUCH_TYPE_GT911)
+    touch.dev = new TAMC_GT911(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST, DISP_WIDTH, DISP_HEIGHT);
+    if (!touch.dev) return DisplayInitResult::TOUCH_FAIL;
+
+    touch.dev->begin();
+    touch.dev->setRotation(TOUCH_ROTATION);
+
+    uint8_t gt911_possible_addresses[] = {0x5D, 0x14};
+    for (uint8_t addr : gt911_possible_addresses)
+    {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0)
+        {
+            touch_addr = addr;
+            break;
+        }
+    }
+
+    if (touch_addr == 0x14) 
+    {
+        touch.dev->begin(0x14);
+        touch.dev->setRotation(TOUCH_ROTATION);
+    }
+#endif
+
+#if defined(TOUCH_TYPE_FT6X36)
+    touch.dev = new FT6X36(TOUCH_INT, TOUCH_RST);
+    if (!touch.dev) return DisplayInitResult::TOUCH_FAIL;
+
+    touch.dev->begin();
+    detected_touch_addr = 0x38;
+#endif
+
+#if defined(TOUCH_TYPE_CST816)
+    touch.dev = new cst816t(TOUCH_SDA, TOUCH_SCL, TOUCH_INT, TOUCH_RST);
+    if (!touch.dev) return DisplayInitResult::TOUCH_FAIL;
+
+    touch.dev->begin();
+    detected_touch_addr = 0x15;
+#endif
+
+    if (touch.dev != nullptr)
+    {
+        if (touch_addr == 0) return DisplayInitResult::TOUCH_FAIL;
+
+        Wire.beginTransmission(touch_addr);
+        if (Wire.endTransmission() != 0)
+        {
+            return DisplayInitResult::TOUCH_FAIL;
+        }
+    }
 
     lv_init();
 

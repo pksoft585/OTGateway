@@ -1,4 +1,9 @@
-#include <CustomOpenTherm.h>
+#if defined(DISPLAY_TYPE_DIYLESS3)
+    #include "stm32/CustomOpenTherm.h"
+#else
+    #include <CustomOpenTherm.h>
+#endif
+
 extern FileData fsSettings;
 
 class OpenThermTask : public Task {
@@ -91,7 +96,12 @@ protected:
     #endif
 
     // create instance
+#if defined(DISPLAY_TYPE_DIYLESS3)
+    this->instance = new CustomOpenTherm(settings.opentherm.inGpio, settings.opentherm.outGpio, OT_RESET_PIN, OT_BOOT_PIN);
+    this->begin();
+#else
     this->instance = new CustomOpenTherm(settings.opentherm.inGpio, settings.opentherm.outGpio);
+#endif
 
     // flags
     this->instanceCreatedTime = millis();
@@ -134,6 +144,10 @@ protected:
     if (vars.states.restarting || vars.states.upgrading) {
       return;
     }
+
+#if defined(DISPLAY_TYPE_DIYLESS3)
+    this->instance->process();
+#endif
 
     if (this->instanceInGpio != settings.opentherm.inGpio || this->instanceOutGpio != settings.opentherm.outGpio) {
       this->setup();
@@ -339,15 +353,19 @@ protected:
       vars.slave.diag.active = false;
       vars.slave.diag.code = 0;
 
-      // reset bus
+      // Reset bus
       if (millis() - this->disconnectedTime > this->resetBusInterval) {
         if (millis() - this->resetBusTime > this->resetBusInterval) {
           Log.sinfoln(FPSTR(L_OT), F("Reset bus..."));
 
           this->instance->end();
-          this->instance->status = OpenThermStatus::NOT_INITIALIZED;
 
+#if defined(DISPLAY_TYPE_DIYLESS3)
+          this->instance->begin();
+#else
+          this->instance->status = OpenThermStatus::NOT_INITIALIZED;
           digitalWrite(this->instanceOutGpio, LOW);
+#endif
           this->resetBusTime = millis();
           this->delay(5000);
         }

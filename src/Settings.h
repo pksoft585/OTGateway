@@ -2,6 +2,10 @@
 #include "display/dt_local.h"
 #endif
 
+#if defined(DISPLAY_TYPE_DIYLESS3)
+#include "display/dt_diyless3.h"
+#endif    
+
 struct NetworkSettings {
   char hostname[25] = DEFAULT_HOSTNAME;
   bool useDhcp = true;
@@ -72,8 +76,15 @@ struct Settings {
 
   struct {
     UnitSystem unitSystem = UnitSystem::METRIC;
+
+#if defined(DISPLAY_TYPE_DIYLESS3)
+    uint8_t inGpio = OT_IN_PIN;
+    uint8_t outGpio = OT_OUT_PIN;
+#else
     uint8_t inGpio = DEFAULT_OT_IN_GPIO;
     uint8_t outGpio = DEFAULT_OT_OUT_GPIO;
+#endif    
+
     uint8_t rxLedGpio = DEFAULT_OT_RX_LED_GPIO;
     uint8_t memberId = 0;
     uint8_t flags = 0;

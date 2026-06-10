@@ -1,9 +1,19 @@
 #include <lvgl.h>
 #include <Arduino_GFX_Library.h>
 #include <Wire.h>
+#include "dt_init.h"
 
 #if defined(DISPLAY_TYPE_DIYLESS3)
 #include "dt_diyless3.h"
+// LVGL buffer
+#define LV_BUF_ROWS 40 
+#endif
+
+#if defined(DISPLAY_TYPE_GUITION)
+#include "dt_guition.h"
+// LVGL buffer
+#define LV_BUF_ROWS 40
+static lv_color_t *lv_buf2 = nullptr;
 #endif
 
 #if defined(TOUCH_TYPE_GT911)
@@ -26,58 +36,10 @@
 LV_IMG_DECLARE(ot_icon_boot);
 #endif
 
-// LVGL buffer
-#define LV_BUF_ROWS 40 
-
-// DisplayTask Interval
+// DisplayTask Interval & Task priority
 #define DISPLAYTASK_INTERVAL 33
-
-// Enum for display initialization results
-enum class DisplayInitResult : uint8_t
-{
-    OK = 0,
-    BUS_FAIL,
-    RGB_FAIL,
-    GFX_ALLOC_FAIL,
-    GFX_BEGIN_FAIL,
-    I2C_FAIL,
-    TOUCH_FAIL,
-    LV_BUF_FAIL,
-    LV_DISPLAY_FAIL,
-    LV_INDEV_FAIL,
-    TIMER_FAIL
-};
-
-const char *displayInitResultToString(DisplayInitResult r)
-{
-    switch (r)
-    {
-    case DisplayInitResult::OK:
-        return "OK";
-    case DisplayInitResult::BUS_FAIL:
-        return "BUS_FAIL";
-    case DisplayInitResult::RGB_FAIL:
-        return "RGB_FAIL";
-    case DisplayInitResult::GFX_ALLOC_FAIL:
-        return "GFX_ALLOC_FAIL";
-    case DisplayInitResult::GFX_BEGIN_FAIL:
-        return "GFX_BEGIN_FAIL";
-    case DisplayInitResult::I2C_FAIL:
-        return "I2C_FAIL";
-    case DisplayInitResult::TOUCH_FAIL:
-        return "TOUCH_FAIL";
-    case DisplayInitResult::LV_BUF_FAIL:
-        return "LV_BUF_FAIL";
-    case DisplayInitResult::LV_DISPLAY_FAIL:
-        return "LV_DISPLAY_FAIL";
-    case DisplayInitResult::LV_INDEV_FAIL:
-        return "LV_INDEV_FAIL";
-    case DisplayInitResult::TIMER_FAIL:
-        return "TIMER_FAIL";
-    default:
-        return "UNKNOWN";
-    }
-}
+const UBaseType_t ACTIVE_PRIORITY = 5;
+const UBaseType_t SLEEP_PRIORITY  = 1;
 
 // AHT20 sensor
 #if defined(DISPLAY_AHT20)
@@ -91,6 +53,7 @@ Arduino_ESP32RGBPanel *rgbpanel = nullptr;
 Arduino_RGB_Display *gfx = nullptr;
 lv_display_t *lv_display = nullptr;
 static lv_color_t *lv_buf1 = nullptr;
+volatile bool displayGrayscaleMode = false;
 
 // LGVL Tick timer
 esp_timer_handle_t lvgl_tick_timer = nullptr;
@@ -150,10 +113,17 @@ void offBacklight()
     ledcWrite(BACKLIGHT_PIN, 0);
 }
 
+// Set grayscale mode
+void setDisplayGrayscale(bool enable)
+{
+    displayGrayscaleMode = enable;
+    lv_obj_invalidate(lv_screen_active()); 
+}
+
 // Display initialization
 DisplayInitResult display_init()
 {
-    bus = new Arduino_SWSPI(DISP_DC, DISP_CS, DISP_SCK, DISP_SDA, DISP_MOSI);
+    bus = new Arduino_SWSPI(DISP_DC, DISP_CS, DISP_SCK, DISP_MOSI, DISP_MISO);
     if (!bus) return DisplayInitResult::BUS_FAIL;
 
     rgbpanel = new Arduino_ESP32RGBPanel(
@@ -233,14 +203,39 @@ DisplayInitResult display_init()
 
     size_t buf_size = (DISP_WIDTH * LV_BUF_ROWS) * sizeof(lv_color_t);
 
+#if defined(DISPLAY_TYPE_GUITION)
+    lv_buf1 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    if (!lv_buf1) return DisplayInitResult::LV_BUF_FAIL;
+    lv_buf2 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    if (!lv_buf2)
+    {
+        heap_caps_free(lv_buf1);
+        return DisplayInitResult::LV_BUF_FAIL; 
+    }
+    lv_display = lv_display_create(DISP_WIDTH, DISP_HEIGHT);
+    if (!lv_display)
+    {
+        heap_caps_free(lv_buf1);
+        heap_caps_free(lv_buf2);
+        return DisplayInitResult::LV_DISPLAY_FAIL;
+    }
+
+    lv_display_set_flush_cb(lv_display, my_disp_flush);
+    lv_display_set_buffers(lv_display, lv_buf1, lv_buf2, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+#else    
     lv_buf1 = (lv_color_t *)heap_caps_malloc(buf_size, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
     if (!lv_buf1) return DisplayInitResult::LV_BUF_FAIL;
 
     lv_display = lv_display_create(DISP_WIDTH, DISP_HEIGHT);
-    if (!lv_display) return DisplayInitResult::LV_DISPLAY_FAIL;
+    if (!lv_display)
+    {
+        heap_caps_free(lv_buf1);
+        return DisplayInitResult::LV_DISPLAY_FAIL;
+    }
 
     lv_display_set_flush_cb(lv_display, my_disp_flush);
     lv_display_set_buffers(lv_display, lv_buf1, NULL, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+#endif
 
     lv_display_set_default(lv_display);
 
@@ -283,6 +278,32 @@ void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
     uint32_t w = area->x2 - area->x1 + 1;
     uint32_t h = area->y2 - area->y1 + 1;
+    uint32_t total_pixels = w * h;
+
+    if (displayGrayscaleMode) {
+        uint16_t *pixel_buffer = (uint16_t *)px_map;
+
+        for (uint32_t i = 0; i < total_pixels; i++) {
+            uint16_t color = pixel_buffer[i];
+
+            uint8_t r = (color >> 11) & 0x1F;
+            uint8_t g = (color >> 5) & 0x3F;
+            uint8_t b = color & 0x1F;
+
+            uint8_t gray_r = (r * 255) / 31;
+            uint8_t gray_g = (g * 255) / 63;
+            uint8_t gray_b = (b * 255) / 31;
+            
+            uint8_t gray = (uint8_t)((gray_r * 77 + gray_g * 150 + gray_b * 29) >> 8);
+
+            uint16_t gray_r_5 = (gray * 31) / 255;
+            uint16_t gray_g_6 = (gray * 63) / 255;
+            uint16_t gray_b_5 = (gray * 31) / 255;
+
+            pixel_buffer[i] = (gray_r_5 << 11) | (gray_g_6 << 5) | gray_b_5;
+        }
+    }
+
     gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t *)px_map, w, h);
     lv_display_flush_ready(disp);
 }

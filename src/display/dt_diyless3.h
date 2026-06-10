@@ -1,9 +1,9 @@
 // HW pins
 #define DISP_DC    GFX_NOT_DEFINED
-#define DISP_MOSI  GFX_NOT_DEFINED
 #define DISP_CS    1
 #define DISP_SCK   12
-#define DISP_SDA   11
+#define DISP_MOSI  11
+#define DISP_MISO  GFX_NOT_DEFINED
 #define DISP_RST   43
 #define DISP_DE    45
 #define DISP_HSYNC 5
@@ -59,8 +59,14 @@
 
 // Touch
 #define TOUCH_TYPE_GT911
-#define TOUCH_SDA   17
-#define TOUCH_SCL   18
-#define TOUCH_INT   10
-#define TOUCH_RST GFX_NOT_DEFINED
+#define TOUCH_SDA      17
+#define TOUCH_SCL      18
+#define TOUCH_INT      10
+#define TOUCH_RST      GFX_NOT_DEFINED
 #define TOUCH_ROTATION ROTATION_INVERTED
+
+// Opentherm STM32
+#define OT_BOOT_PIN    44
+#define OT_RESET_PIN   13
+#define OT_IN_PIN      12
+#define OT_OUT_PIN     11

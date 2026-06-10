@@ -315,12 +315,29 @@ namespace NetworkUtils {
             WiFi.localIP().toString().c_str(),
             WiFi.RSSI()
           );
+
+          #if defined(DISPLAY_TYPE_ESPNOW)
+          extern void espnow_reinit_hook(uint8_t channel);
+          espnow_reinit_hook(WiFi.channel());
+          #endif
+
         }
 
         if (this->isApEnabled() && millis() - this->connectedTime > this->reconnectInterval && !this->hasApClients()) {
           Log.sinfoln(FPSTR(L_NETWORK), F("Stop AP because STA connected"));
 
+          #if defined(DISPLAY_TYPE_ESPNOW)
+          extern void espnow_deinit_hook();
+          espnow_deinit_hook();
+          #endif
+
           WiFi.mode(WIFI_STA);
+
+          #if defined(DISPLAY_TYPE_ESPNOW)
+          extern void espnow_reinit_hook(uint8_t channel);
+          espnow_reinit_hook(WiFi.channel());
+          #endif
+
           return;
         }
 
@@ -347,16 +364,36 @@ namespace NetworkUtils {
         if (!this->hasStaCredentials() && !this->isApEnabled()) {
           Log.sinfoln(FPSTR(L_NETWORK), F("No STA credentials, start AP"));
 
+          #if defined(DISPLAY_TYPE_ESPNOW)
+          extern void espnow_deinit_hook();
+          extern void espnow_reinit_hook(uint8_t channel);
+          espnow_deinit_hook();
+          #endif
+
           WiFi.mode(WIFI_AP_STA);
           this->delayCallback(250);
           WiFi.softAP(this->apName, this->apPassword, this->apChannel);
+
+          #if defined(DISPLAY_TYPE_ESPNOW)
+          espnow_reinit_hook(this->apChannel);
+          #endif
 
         } else if (!this->isApEnabled() && millis() - this->disconnectedTime > this->failedConnectTimeout) {
           Log.sinfoln(FPSTR(L_NETWORK), F("Disconnected for a long time, start AP"));
 
+          #if defined(DISPLAY_TYPE_ESPNOW)
+          extern void espnow_deinit_hook();
+          extern void espnow_reinit_hook(uint8_t channel);
+          espnow_deinit_hook();
+          #endif
+
           WiFi.mode(WIFI_AP_STA);
           this->delayCallback(250);
           WiFi.softAP(this->apName, this->apPassword, this->apChannel);
+
+          #if defined(DISPLAY_TYPE_ESPNOW)
+          espnow_reinit_hook(this->apChannel);
+          #endif
 
         } else if (this->isConnecting() && millis() - this->prevReconnectingTime > this->resetConnectionTimeout) {
           Log.swarningln(FPSTR(L_NETWORK), F("Connection timeout, reset wifi..."));

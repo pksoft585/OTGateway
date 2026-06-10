@@ -128,8 +128,10 @@ protected:
       pollingDallasSensors();
       this->yield();
 
+#if defined(DISPLAY_AHT20)
       pollingAhtSensors();
       this->yield();
+#endif
 
       pollingNtcSensors();
       this->yield();

@@ -45,6 +45,9 @@
 #define DISP_WIDTH  480
 #define DISP_HEIGHT 480
 
+// Display rotation
+#define DISP_ROTATION 0
+
 // Display init
 #define DISP_INIT_SEQ    st7701_type1_init_operations
 

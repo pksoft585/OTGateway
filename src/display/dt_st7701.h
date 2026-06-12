@@ -1,3 +1,5 @@
+#pragma once
+
 #include <lvgl.h>
 #include <Arduino_GFX_Library.h>
 #include <Wire.h>
@@ -65,7 +67,8 @@ void SplashScreen();
 
 // Touch structure
 template <typename T>
-struct TouchStructure {
+struct TouchStructure
+{
     int16_t x = 0;
     int16_t y = 0;
     bool pressed = false;
@@ -142,6 +145,7 @@ DisplayInitResult display_init()
     if (!gfx) return DisplayInitResult::GFX_ALLOC_FAIL;
 
     if (!gfx->begin()) return DisplayInitResult::GFX_BEGIN_FAIL;
+    gfx->setRotation(DISP_ROTATION);
 
     if (!Wire.begin(TOUCH_SDA, TOUCH_SCL)) return DisplayInitResult::I2C_FAIL;
 
@@ -246,12 +250,14 @@ DisplayInitResult display_init()
     lv_indev_set_read_cb(indev, my_touchpad_read);
     lv_indev_set_display(indev, lv_display);
 
-    const esp_timer_create_args_t tick_args = {
+    const esp_timer_create_args_t tick_args =
+    {
         .callback = [](void *)
         { lv_tick_inc(DISPLAYTASK_INTERVAL); },
         .arg = NULL,
         .dispatch_method = ESP_TIMER_TASK,
-        .name = "lvgl_tick"};
+        .name = "lvgl_tick"
+    };
     if (esp_timer_create(&tick_args, &lvgl_tick_timer) != ESP_OK) return DisplayInitResult::TIMER_FAIL;
 
     esp_timer_start_periodic(lvgl_tick_timer, DISPLAYTASK_INTERVAL * 1000);
@@ -280,10 +286,12 @@ void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
     uint32_t h = area->y2 - area->y1 + 1;
     uint32_t total_pixels = w * h;
 
-    if (displayGrayscaleMode) {
+    if (displayGrayscaleMode)
+    {
         uint16_t *pixel_buffer = (uint16_t *)px_map;
 
-        for (uint32_t i = 0; i < total_pixels; i++) {
+        for (uint32_t i = 0; i < total_pixels; i++)
+        {
             uint16_t color = pixel_buffer[i];
 
             uint8_t r = (color >> 11) & 0x1F;

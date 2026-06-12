@@ -58,30 +58,30 @@ void addPeer(const uint8_t *mac, uint8_t channel)
     if (mac[0] == 0xFF)
     {
         peerInfo.ifidx = WIFI_IF_AP;
-        Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Broadcast peer on AP interface."));
+        Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Broadcast peer on AP interface"));
     }
     else
     {
         if (mode == WIFI_MODE_APSTA)
         {
             peerInfo.ifidx = WIFI_IF_AP;
-            Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Unicast peer on AP interface."));
+            Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Unicast peer on AP interface"));
         }
         else if (mode == WIFI_MODE_AP)
         {
             peerInfo.ifidx = WIFI_IF_AP;
-            Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Unicast peer on AP interface."));
+            Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Unicast peer on AP interface"));
         }
         else
         {
             peerInfo.ifidx = WIFI_IF_STA;
-            Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Unicast peer on STA interface."));
+            Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Unicast peer on STA interface"));
         }
     }
 
     if (esp_now_add_peer(&peerInfo) != ESP_OK)
     {
-        Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Add peer error!"));
+        Log.serrorln(FPSTR(L_DISPLAY), F("Esp-now: Add peer error!"));
     }
 }
 
@@ -92,7 +92,7 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *incomingDat
     uint32_t current_time = millis();
 
 /*
-    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Raw data length: %d, type: %d."), len, type);
+    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Raw data - length: %d, type: %d"), len, type);
 */    
     switch (type) 
     {
@@ -100,7 +100,7 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *incomingDat
             if (len == sizeof(displayValues))
             {
                 memcpy(&espnow_disp, incomingData, sizeof(displayValues));
-                Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Display data received."));
+                Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Display data received"));
                 espnow.last_data = current_time;
                 espnow.received = true;
             }
@@ -110,17 +110,17 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *incomingDat
             if (len == sizeof(pairingData))
             {
                 memcpy(&espnow_pairing, incomingData, sizeof(pairingData));
-                Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Pairing request."));
+                Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Pairing request received"));
 
                 if (espnow_pairing.id > 0)
                 {
                     memcpy(displayMac, recv_info->src_addr, 6);
                     displayChannel = espnow_pairing.channel;
 
-                    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Display MAC: %02X:%02X:%02X:%02X:%02X:%02X."), 
+                    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Display MAC: %02X:%02X:%02X:%02X:%02X:%02X"), 
                                 displayMac[0], displayMac[1], displayMac[2], 
                                 displayMac[3], displayMac[4], displayMac[5]);
-                    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Display channel: %d."), displayChannel);
+                    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Display channel: %d"), displayChannel);
                     
                     WiFi.setChannel(displayChannel, WIFI_SECOND_CHAN_NONE);
                     esp_now_del_peer(displayMac);
@@ -134,18 +134,18 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *incomingDat
                     memcpy(espnow_pairing.macAddr, thermostatMac, 6);
                     espnow_pairing.channel = thermostatChannel;
 
-                    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Pairing response sending..."));
+//                    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Pairing response sending..."));
                     esp_err_t result = esp_now_send(displayMac, (uint8_t *) &espnow_pairing, sizeof(pairingData));
                     if (result == ESP_OK)
                     {
-                        Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Pairing OK."));
+                        Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Display paired"));
                         espnow.paired = true;
                         collectEspnowValues();
                         espnow.to_sent = true;
                     }
                     else
                     {
-                        Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Pairing response error: %d."), result);
+                        Log.serrorln(FPSTR(L_DISPLAY), F("Esp-now: Pairing response sending error: %d!"), result);
                     }     
                 }
             }  
@@ -157,43 +157,41 @@ bool init_esp_now()
 {
     WiFi.macAddress(thermostatMac);
 
-    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Thermostat MAC: %02X:%02X:%02X:%02X:%02X:%02X."), 
+    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Thermostat MAC: %02X:%02X:%02X:%02X:%02X:%02X"), 
                 thermostatMac[0], thermostatMac[1], thermostatMac[2], 
                 thermostatMac[3], thermostatMac[4], thermostatMac[5]);
                                 
     if (esp_now_init() != ESP_OK)
     {
-        Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Initialization failed!"));
+        Log.serrorln(FPSTR(L_DISPLAY), F("Esp-now: Initialization failed!"));
         return false;
     }
 
-    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: WiFi mode: %d."), WiFi.getMode());
-    
+    wifi_mode_t t_mode = (wifi_mode_t)WiFi.getMode();
+    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: WiFi mode: %d"), t_mode);
+
     if (vars.network.connected)
     {
         thermostatChannel = WiFi.channel();
-        Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Wi-Fi channel (from connected): %d."), thermostatChannel);
+        Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Wi-Fi channel (STA): %d"), thermostatChannel);
     }
     else 
     {
-        wifi_mode_t t_mode = (wifi_mode_t)WiFi.getMode();
-        Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: WiFi mode enum: %d."), t_mode);
-
         if (t_mode == WIFI_MODE_AP || t_mode == WIFI_MODE_APSTA) 
         {
             thermostatChannel = WiFi.channel();
-            Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Wi-Fi channel (from AP channel): %d."), thermostatChannel);
+            Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Wi-Fi channel (AP): %d"), thermostatChannel);
         } 
         else 
         {
             esp_err_t chan_err = esp_wifi_set_channel(thermostatChannel, WIFI_SECOND_CHAN_NONE);
             if (chan_err != ESP_OK)
             {
-                Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Channel set error: %d."), chan_err);
+                Log.serrorln(FPSTR(L_DISPLAY), F("Esp-now: Channel set error: %d!"), chan_err);
                 esp_now_deinit();
                 return false;
             }
-            Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Wi-Fi channel (set): %d."), thermostatChannel);
+            Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Wi-Fi channel (Set): %d"), thermostatChannel);
         }
     }
 
@@ -216,7 +214,7 @@ namespace NetworkUtils {
             esp_now_deinit();
             espnow.initialized = false;
             espnow.paired = false;
-            Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Deinitialized due to Wi-Fi mode change."));
+            Log.swarningln(FPSTR(L_DISPLAY), F("Esp-now: Deinitialized due to Wi-Fi mode change"));
         }
     }
 
@@ -296,19 +294,6 @@ static bool collectEspnowValues()
         page.enabled = settings.heating.enabled;
         page.turbo = settings.heating.turbo;
         page.active = vars.slave.heating.active;
-        
-/*
-        Log.sinfoln(FPSTR(L_DISPLAY), 
-            F("  >>> HEATING Raw - arcVal: %d, min: %d, max: %d, curVal: %d, en: %d, turbo: %d, act: %d."),
-            page.arcValue,
-            page.arcMinValue,
-            page.arcMaxValue,
-            page.currentValue,
-            page.enabled ? 1 : 0,
-            page.turbo ? 1 : 0,
-            page.active ? 1 : 0
-        );
-*/    
     }
 
     // ---- DHW ----
@@ -323,19 +308,6 @@ static bool collectEspnowValues()
 
         page.enabled = settings.dhw.enabled;
         page.active = vars.slave.dhw.active;
-
-
-/*
-        Log.sinfoln(FPSTR(L_DISPLAY), 
-            F("  >>> DHW Raw - arcVal: %d, min: %d, max: %d, curVal: %d, en: %d, act: %d."),
-            page.arcValue,
-            page.arcMinValue,
-            page.arcMaxValue,
-            page.currentValue,
-            page.enabled ? 1 : 0,
-            page.active ? 1 : 0
-        );
-*/    
     }
 
     // ---- DISPLAY ----
@@ -351,17 +323,6 @@ static bool collectEspnowValues()
 
         page.enabled = true;
         page.active = true;
-
-
-/*
-        Log.sinfoln(FPSTR(L_DISPLAY), 
-            F("  >>> DISP Raw - arcVal: %d, min: %d, max: %d, curVal: %d."),
-            page.arcValue,
-            page.arcMinValue,
-            page.arcMaxValue,
-            page.currentValue
-        );
-*/    
     }
 
     // ---- Test for changes or timeout ---
@@ -394,38 +355,13 @@ static void storeEspnowValues()
     settings.display.timeout_ms = espnow_disp.dispTimeout;
 
     display.to_save = true;
-    
-/*
-    Log.sinfoln(FPSTR(L_DISPLAY), 
-        F("  >>> Display Raw - HeatTgt: %d, HeatEn: %d, HeatTu: %d, DhwTgt: %d, DhwEn: %d, BackTgt: %d, DisTim: %d, act: %d."),
-        espnow_disp.heatingTarget,
-        espnow_disp.heatingEnabled ? 1 : 0,
-        espnow_disp.heatingTurbo ? 1 : 0,
-        espnow_disp.dhwTarget,
-        espnow_disp.dhwEnabled ? 1 : 0,
-        espnow_disp.backlightTarget,
-        espnow_disp.dispTimeout,
-        espnow_disp.language
-    );
-*/    
 }
 
 #else
 
 // Local Display
-
-// Forward declarations
-void renderPage(DisplayPage page);
-
-// Helpers
-// Temperature unit helper
-static inline const char *temperatureUnit()
-{
-    return (settings.system.unitSystem ==
-            UnitSystem::METRIC)
-               ? "°C"
-               : "°F";
-}
+const char* wifi_ip_text = "";
+const char* temperatureUnit = "°C";
 
 #if defined(DISPLAY_AHT20)
 // AHT20 sensor update
@@ -456,88 +392,54 @@ void displayOff()
 // Callbacks - Events
 static void heating_enable_cb(lv_event_t *e)
 {
+    if(lv_event_get_indev(e) == NULL) return;
+
     settings.heating.enabled = lv_obj_has_state((lv_obj_t *)lv_event_get_target(e), LV_STATE_CHECKED);
     display.to_save = true;
 }
 
 static void heating_turbo_cb(lv_event_t *e)
 {
+    if(lv_event_get_indev(e) == NULL) return;
+
     settings.heating.turbo = lv_obj_has_state((lv_obj_t *)lv_event_get_target(e), LV_STATE_CHECKED);
     display.to_save = true;
 }
 
 static void dhw_enable_cb(lv_event_t *e)
 {
+    if(lv_event_get_indev(e) == NULL) return;
+
     settings.dhw.enabled = lv_obj_has_state((lv_obj_t *)lv_event_get_target(e), LV_STATE_CHECKED);
     display.to_save = true;
 }
 
 static void display_language_cb(lv_event_t *e)
 {
+    if(lv_event_get_indev(e) == NULL) return;
+
     settings.display.language = static_cast<Language>((static_cast<uint8_t>(g_last.common.language) + 1) % 7);
 }
 
 static void display_timeout_cb(lv_event_t *e)
 {
-    settings.display.timeout_ms = lv_slider_get_value((lv_obj_t *)lv_event_get_target(e)) * 1000;
-    display.to_save = true;
-}
-
-static void page_prev_cb(lv_event_t *e)
-{
-    const PageLayout& layout = PAGE_LAYOUTS[pageIndex(currentPage)];
-    renderPage(layout.prevPage);
-}
-
-static void page_next_cb(lv_event_t *e)
-{
-    const PageLayout& layout = PAGE_LAYOUTS[pageIndex(currentPage)];
-    renderPage(layout.nextPage);
-}
-
-// Callbacks - ARC
-static void arc_value_changed_cb(lv_event_t *e)
-{
-    lv_obj_t *arc = (lv_obj_t *)lv_event_get_target(e);
-    int value = lv_arc_get_value(arc);
-
-    switch (currentPage)
+    lv_event_code_t code = lv_event_get_code(e);
+    
+    if(code == LV_EVENT_VALUE_CHANGED)
     {
-        // HEATING
-        case DisplayPage::HEATING:
-        {
-            float temp = value / 10.0f;
-            char buf[16];
-            snprintf(buf, sizeof(buf), "%.1f%s", temp, temperatureUnit());
-            lv_label_set_text(ui.setpoint, buf);
-            break;
-        }
+        if(lv_event_get_indev(e) == NULL) return; 
 
-        // DHW
-        case DisplayPage::DHW:
-        {
-            char buf[16];
-            snprintf(buf, sizeof(buf), "%d%s", value, temperatureUnit());
-            lv_label_set_text(ui.setpoint, buf);
-            break;
-        }
-
-        // DISPLAY
-        case DisplayPage::DISP:
-        {
-            char buf[16];
-            snprintf(buf, sizeof(buf), "%d%%", value);
-            lv_label_set_text(ui.setpoint, buf);
-            break;
-        }
-
-        default:
-            break;
+        settings.display.timeout_ms = lv_slider_get_value((lv_obj_t *)lv_event_get_target(e)) * 1000;
+        display.to_save = true;
     }
+
 }
 
+// Callback - ARC
 static void arc_released_cb(lv_event_t *e)
 {
+    if(lv_event_get_indev(e) == NULL) return;
+
     lv_obj_t *arc = (lv_obj_t *)lv_event_get_target(e);
     int value = lv_arc_get_value(arc);
 
@@ -573,369 +475,24 @@ static void arc_released_cb(lv_event_t *e)
     }
 }
 
-// Callbacks - Main buttons
-static void btn_main1_cb(lv_event_t *e)
-{
-    const PageLayout& layout = PAGE_LAYOUTS[pageIndex(currentPage)];
-    if (layout.btnMain1Callback)
-    {
-        layout.btnMain1Callback(e);
-    }
-}
-
-static void btn_main2_cb(lv_event_t *e)
-{
-    const PageLayout& layout = PAGE_LAYOUTS[pageIndex(currentPage)];
-    if (layout.btnMain2Callback)
-    {
-        layout.btnMain2Callback(e);
-    }
-}
-
-// Render Page layout
-void renderPage(DisplayPage page)
-{
-    currentPage = page;
-
-    const PageLayout& layout = PAGE_LAYOUTS[pageIndex(page)];
-    PageValues& vals = g_pages[pageIndex(page)];
-
-    // ---- VISIBILITY ----
-    setVisible(ui.arc,        layout.flags & PF_ARC);
-    setVisible(ui.setpoint,   layout.flags & PF_SETPOINT);
-    setVisible(ui.current,    layout.flags & PF_CURRENT);
-    setVisible(ui.btn_main1,  layout.flags & PF_BTN_MAIN1);
-    setVisible(ui.btn_main2,  layout.flags & PF_BTN_MAIN2);
-    setVisible(ui.btn_prev,   layout.flags & PF_BTN_PREV);
-    setVisible(ui.btn_next,   layout.flags & PF_BTN_NEXT);
-    setVisible(ui.slider,     layout.flags & PF_SLIDER);
-    setVisible(ui.info,       layout.flags & PF_INFO);
-
-    // ---- ARC ----
-    if (layout.flags & PF_ARC)
-    {
-        lv_arc_set_range(ui.arc, vals.arcMinValue, vals.arcMaxValue);
-        lv_arc_set_value(ui.arc, vals.arcValue);
-        lv_obj_set_style_arc_color(ui.arc, layout.color, LV_PART_INDICATOR);
-    }
-
-    // ---- FLAME ----
-    lv_label_set_text(ui.icon_flame, layout.flameIcon);
-    lv_obj_set_style_text_color(ui.icon_flame, layout.color, 0);
-
-    // ---- ACTION ----
-    if (layout.flags & PF_ACTION)
-    {
-        lv_label_set_text(ui.action, tr(g_last.common.language, layout.actionText));
-        lv_obj_set_style_text_color(ui.action, layout.color, 0);
-        setVisible(ui.action, vals.active);
-    }
-
-    // ---- SETPOINT ----
-    if (layout.flags & PF_SETPOINT)
-    {
-        switch (page)
-        {
-            case DisplayPage::HEATING:
-                lv_label_set_text_fmt(ui.setpoint,"%d.%d%s", vals.arcValue / 10, abs(vals.arcValue % 10), temperatureUnit());
-                break;
-
-            case DisplayPage::DHW:
-                lv_label_set_text_fmt(ui.setpoint, "%d%s", vals.arcValue, temperatureUnit());
-                break;
-
-            case DisplayPage::DISP:
-                lv_label_set_text_fmt(ui.setpoint, "%d%%", vals.arcValue);
-                break;
-
-            default:
-                break;
-        }
-    }
-
-    // ---- CURRENT ----
-    if (layout.flags & PF_CURRENT)
-    {
-        switch (page)
-        {
-            case DisplayPage::HEATING:
-            case DisplayPage::DHW:
-            {
-                lv_obj_set_style_text_font(ui.current, &lv_font_montserrat_36, 0);
-                lv_label_set_text_fmt(ui.current, "%d.%d%s", vals.currentValue / 10, abs(vals.currentValue % 10), temperatureUnit());
-                break;
-            }
-
-            case DisplayPage::DISP:
-            {
-                lv_obj_set_style_text_font(ui.current, &lv_font_montserrat_24_ext, 0);
-                lv_label_set_text_fmt(ui.current, "%s: %ds", tr(g_last.common.language, DisplayText::TIMEOUT), vals.currentValue);
-                break;
-            }
-
-            default:
-                break;
-        }
-        lv_obj_set_style_text_color(ui.current, layout.color, 0);
-    }
-
-    // ---- BUTTON MAIN1 ----
-    if (layout.flags & PF_BTN_MAIN1)
-    {
-        if (page == DisplayPage::DISP)
-        {
-            lv_obj_add_state(ui.btn_main1, LV_STATE_CHECKED);
-            lv_label_set_text(ui.btn_main1_label, tr(g_last.common.language, lt(g_last.common.language)));
-        }
-        else
-        {
-            if (vals.enabled)
-            {
-                lv_obj_add_state(ui.btn_main1, LV_STATE_CHECKED);
-                lv_label_set_text(ui.btn_main1_label, tr(g_last.common.language, layout.btnMain1Text));
-            }    
-            else
-            {
-                lv_obj_clear_state(ui.btn_main1, LV_STATE_CHECKED);
-                lv_label_set_text(ui.btn_main1_label, tr(g_last.common.language, layout.btnMain1Text));
-            }    
-        }
-        lv_obj_set_style_bg_color(ui.btn_main1, layout.color, LV_STATE_CHECKED);
-    }
-
-    // ---- BUTTON MAIN2 ----
-    if (layout.flags & PF_BTN_MAIN2)
-    {
-        lv_label_set_text(ui.btn_main2_label, tr(g_last.common.language, layout.btnMain2Text));
-        lv_obj_set_style_bg_color(ui.btn_main2, layout.color, LV_STATE_CHECKED);
-        if (vals.turbo)
-        {
-            lv_obj_add_state(ui.btn_main2, LV_STATE_CHECKED);
-        }
-        else
-        {
-            lv_obj_clear_state(ui.btn_main2, LV_STATE_CHECKED);
-        }
-    }
-
-    // ---- SLIDER ----
-    if (layout.flags & PF_SLIDER)
-    {
-        lv_slider_set_range(ui.slider, 0, 120);
-        lv_slider_set_value(ui.slider, vals.currentValue, LV_ANIM_OFF);
-        lv_obj_set_style_bg_color(ui.slider, layout.color, LV_PART_INDICATOR);
-    }
-}
-
-// UI add events 
-void eventsUI()
-{
-    // ---- ARC ----
-    lv_obj_add_event_cb(ui.arc, arc_value_changed_cb, LV_EVENT_VALUE_CHANGED, nullptr);
-    lv_obj_add_event_cb(ui.arc, arc_released_cb, LV_EVENT_RELEASED, nullptr);
-
-    // ---- BUTTON MAIN1 ---- 
-    lv_obj_add_event_cb(ui.btn_main1, btn_main1_cb, LV_EVENT_CLICKED, nullptr);
-
-    // ---- BUTTON MAIN2 ----
-    lv_obj_add_event_cb(ui.btn_main2, btn_main2_cb, LV_EVENT_CLICKED, nullptr);
-
-    // ---- PREV ----
-    lv_obj_add_event_cb(ui.btn_prev, page_prev_cb, LV_EVENT_CLICKED, nullptr);
-
-    // ---- NEXT ----
-    lv_obj_add_event_cb(ui.btn_next, page_next_cb, LV_EVENT_CLICKED, nullptr);
-
-    // ---- SLIDER ----
-    lv_obj_add_event_cb(ui.slider, display_timeout_cb, LV_EVENT_VALUE_CHANGED, nullptr);
-
-    // ---- INITIAL VALUES ----
-
-    g_last.common.language = g_last.current.language;
-}
-
-// UI Update
-void updateUI()
-{
-    const uint8_t idx = pageIndex(currentPage);
-
-    PageValues& vals = g_pages[idx];
-    PageValues& last = g_last.pages[idx];
-
-    // ---- Language ----
-    if (g_last.common.language != g_last.current.language)
-    {
-        g_last.common.language = g_last.current.language;
-        renderPage(currentPage);
-    }
-
-    // ---- WIFI ----
-    if (g_last.common.wifiConnected != g_last.current.wifiConnected )
-    {
-        g_last.common.wifiConnected = g_last.current.wifiConnected;
-        lv_obj_set_style_text_color(ui.icon_wifi,
-            g_last.common.wifiConnected
-                ? lv_color_white()
-                : gray_color,
-            0);
-            if (g_last.common.wifiConnected)
-            {
-                lv_label_set_text(ui.info, WiFi.localIP().toString().c_str());
-            }    
-            else
-            {
-                lv_label_set_text(ui.info, "");
-            }    
-    }
-
-    // ---- MQTT ----
-    if (g_last.common.mqttConnected != g_last.current.mqttConnected)
-    {
-        g_last.common.mqttConnected = g_last.current.mqttConnected;
-        lv_obj_set_style_text_color(ui.icon_mqtt,
-            g_last.common.mqttConnected
-                ? lv_color_white()
-                : gray_color,
-            0);
-    }
-
-    // ---- OPENTHERM ----
-    if (g_last.common.openthermConnected != g_last.current.openthermConnected)
-    {
-        g_last.common.openthermConnected = g_last.current.openthermConnected;
-        lv_obj_set_style_text_color(ui.icon_opentherm,
-            g_last.common.openthermConnected
-                ? lv_color_white()
-                : gray_color,
-            0);
-    }
-
-    // ---- FLAME ----
-    if (g_last.common.flame != g_last.current.flame)
-    {
-        g_last.common.flame = g_last.current.flame;
-        setVisible(ui.icon_flame, g_last.common.flame);
-    }
-
-    // ---- TIME ----
-    if (g_last.common.unixTime != g_last.current.unixTime)
-    {
-        g_last.common.unixTime = g_last.current.unixTime;
-        const uint32_t timeValue = g_last.common.unixTime;
-        const uint8_t hour = timeValue / 60;
-        const uint8_t minute = timeValue % 60;
-        char buf[6];
-        snprintf(buf, sizeof(buf), "%02u:%02u", hour, minute);
-        lv_label_set_text(ui.time, buf);
-    }
-
-    // ---- ARC RANGE ----
-    if ((last.arcMinValue != vals.arcMinValue) || (last.arcMaxValue != vals.arcMaxValue))
-    {
-        last.arcMinValue = vals.arcMinValue;
-        last.arcMaxValue = vals.arcMaxValue;
-        lv_arc_set_range(ui.arc, last.arcMinValue,  last.arcMaxValue);
-    }
-
-    // ---- ARC VALUE ----
-    if (last.arcValue != vals.arcValue)
-    {
-        last.arcValue = vals.arcValue;
-        lv_arc_set_value(ui.arc, last.arcValue);
-
-        switch (currentPage)
-        {
-            // HEATING
-            case DisplayPage::HEATING:
-            {
-                lv_label_set_text_fmt(ui.setpoint, "%d.%d%s", last.arcValue / 10, abs(last.arcValue % 10), temperatureUnit());
-                break;
-            }
-
-            // DHW
-            case DisplayPage::DHW:
-            {
-                lv_label_set_text_fmt(ui.setpoint, "%d%s", last.arcValue, temperatureUnit());
-                break;
-            }
-
-            // DISPLAY
-            case DisplayPage::DISP:
-            {
-                lv_label_set_text_fmt(ui.setpoint, "%d%%", last.arcValue);
-                break;
-            }
-
-            default:
-                break;
-        }
-    }
-
-    // ---- CURRENT ----
-    if (last.currentValue != vals.currentValue)
-    {
-        last.currentValue = vals.currentValue;
-        switch (currentPage)
-        {
-            // DISPLAY
-            case DisplayPage::DISP:
-            {
-                lv_slider_set_value(ui.slider, last.currentValue, LV_ANIM_OFF);
-                lv_label_set_text_fmt(ui.current, "%s: %ds", tr(g_last.common.language, DisplayText::TIMEOUT), last.currentValue);
-                break;
-            }
-
-            // HEATING, DHW TEMP
-            default:
-            {
-                lv_label_set_text_fmt(ui.current, "%d.%d%s", last.currentValue / 10, abs(last.currentValue % 10),  temperatureUnit());
-                break;
-            }
-        }
-    }
-
-    // ---- ACTION ----
-    if (last.active != vals.active)
-    {
-        last.active = vals.active;
-        setVisible(ui.action, last.active);
-    }
-
-    // ---- ENABLED ----
-    if (last.enabled != vals.enabled)
-    {
-        last.enabled = vals.enabled;
-        if (last.enabled)
-        {
-            lv_obj_add_state(ui.btn_main1, LV_STATE_CHECKED);
-        }
-        else
-        {
-            lv_obj_clear_state(ui.btn_main1, LV_STATE_CHECKED);
-        }
-    }
-
-    // ---- TURBO ----
-    if (last.turbo != vals.turbo)
-    {
-        last.turbo = vals.turbo;
-        if (last.turbo)
-        {
-            lv_obj_add_state(ui.btn_main2, LV_STATE_CHECKED);
-        }
-        else
-        {
-            lv_obj_clear_state(ui.btn_main2, LV_STATE_CHECKED);
-        }
-    }
-}
-
 // Data mining
 static void collectPageValues()
 {
     // ---- COMMON ----
+    temperatureUnit = (settings.system.unitSystem == UnitSystem::METRIC) ? "°C" : "°F";
+
     g_last.current.language = settings.display.language;
     g_last.current.wifiConnected = vars.network.connected;
+
+    if (g_last.current.wifiConnected)
+    {
+        wifi_ip_text = WiFi.localIP().toString().c_str();
+    }    
+    else
+    {
+        wifi_ip_text = "";
+    }    
+
     g_last.current.mqttConnected = vars.mqtt.connected;
     g_last.current.openthermConnected = vars.slave.connected;
     g_last.current.flame = vars.slave.flame;
@@ -1086,7 +643,7 @@ private:
                 esp_err_t result = esp_now_send(displayMac, (uint8_t *)&espnow_heartbeat, sizeof(heartbeatData));
                 if (result != ESP_OK)
                 {
-                    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Heartbeat sending error: %d."), result);
+                    Log.serrorln(FPSTR(L_DISPLAY), F("Esp-now: Heartbeat sending error: %d!"), result);
                 }
             }
         }
@@ -1125,7 +682,7 @@ private:
                 
                 if (result != ESP_OK)
                 {
-                    Log.sinfoln(FPSTR(L_DISPLAY), F("Esp-now: Data sending error: %d."), result);
+                    Log.serrorln(FPSTR(L_DISPLAY), F("Esp-now: Data sending error: %d!"), result);
                 }
             }
         }
@@ -1138,6 +695,7 @@ private:
     {
         settings.display.enabled = true;
         normalizeDisplaySettings();
+        temperatureUnit = (settings.system.unitSystem == UnitSystem::METRIC) ? "°C" : "°F";
 
 #if defined(DISPLAY_AHT20)
         SensorAHT20.found = dt_aht20;
@@ -1149,7 +707,6 @@ private:
 
         collectPageValues();
         createUI();
-        eventsUI();
         renderPage(currentPage);
         updateUI();
         lv_timer_handler();

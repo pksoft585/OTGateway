@@ -99,7 +99,7 @@ uint8_t displayChannel = 6;
 uint8_t thermostatChannel = 6;
 
 uint8_t current_scan_channel = 1; 
-const uint16_t CHANNEL_SWITCH_DELAY = 500;
+const uint16_t CHANNEL_SWITCH_DELAY = 1000;
 
 static void defaultPageValues()
 {

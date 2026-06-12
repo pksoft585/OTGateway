@@ -31,19 +31,22 @@
 // Display sync
 #define DISP_HSYNC_POL    1
 #define DISP_HFRONT_PORCH 10
-#define DISP_HPULSE_WIDTH 10
+#define DISP_HPULSE_WIDTH 8
 #define DISP_HBACK_PORCH  50
 #define DISP_VSYNC_POL    1
 #define DISP_VFRONT_PORCH 10
-#define DISP_VPULSE_WIDTH 10
+#define DISP_VPULSE_WIDTH 8
 #define DISP_VBACK_PORCH  20
 #define DISP_PCLK_ACT_NEG false
-#define DISP_PREFER_SPEED 8000000L
+#define DISP_PREFER_SPEED 6000000L
 #define DISP_BOUNCE       false
 
 // Display resolution
 #define DISP_WIDTH  480
 #define DISP_HEIGHT 480
+
+// Display rotation
+#define DISP_ROTATION 0
 
 // Display init
 #define DISP_INIT_SEQ    st7701_type9_init_operations

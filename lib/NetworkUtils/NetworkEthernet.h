@@ -18,7 +18,7 @@ namespace NetworkUtils {
       if (this->restartFlag) {
         this->restartFlag = false;
 
-        // The W5500 driver cannot be re-initialized in place: Arduino's ETH.end() leaves
+        // The Ethernet driver cannot be re-initialized in place: Arduino's ETH.end() leaves
         // the SPI bus allocated, so a wiring change only takes effect after a restart.
         if (this->started) {
           Log.swarningln(FPSTR(L_NETWORK), F("Ethernet: settings changed, restart required to apply them"));

@@ -7,7 +7,7 @@
   #include <esp_wifi.h>
 #endif
 
-// W5500 support needs both the ESP32 core (for ETH.h) and the per-env USE_ETHERNET flag.
+// ETHERNET support needs both the ESP32 core (for ETH.h) and the per-env USE_ETHERNET flag.
 // USE_ETHERNET defaults to false in defines.h, so this must be a value test, not #ifdef.
 #if USE_ETHERNET && defined(ARDUINO_ARCH_ESP32)
   #define NETWORK_HAS_ETHERNET

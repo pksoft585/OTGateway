@@ -182,14 +182,52 @@ namespace NetworkUtils {
 
     EthernetImplementation getImplementation() const { return this->implementation; }
 
-    IPAddress localIP() override { #ifdef NETWORK_HAS_ETHERNET return ETH.localIP(); #else return IPAddress(); #endif }
-    IPAddress subnetMask() override { #ifdef NETWORK_HAS_ETHERNET return ETH.subnetMask(); #else return IPAddress(); #endif }
-    IPAddress gatewayIP() override { #ifdef NETWORK_HAS_ETHERNET return ETH.gatewayIP(); #else return IPAddress(); #endif }
-    IPAddress dnsIP() override { #ifdef NETWORK_HAS_ETHERNET return ETH.dnsIP(); #else return IPAddress(); #endif }
-    String macAddress() override { #ifdef NETWORK_HAS_ETHERNET return ETH.macAddress(); #else return String(); #endif }
+    IPAddress localIP() override {
+      #ifdef NETWORK_HAS_ETHERNET
+      return ETH.localIP();
+      #else
+      return IPAddress();
+      #endif
+    }
+
+    IPAddress subnetMask() override {
+      #ifdef NETWORK_HAS_ETHERNET
+      return ETH.subnetMask();
+      #else
+      return IPAddress();
+      #endif
+    }
+
+    IPAddress gatewayIP() override {
+      #ifdef NETWORK_HAS_ETHERNET
+      return ETH.gatewayIP();
+      #else
+      return IPAddress();
+      #endif
+    }
+
+    IPAddress dnsIP() override {
+      #ifdef NETWORK_HAS_ETHERNET
+      return ETH.dnsIP();
+      #else
+      return IPAddress();
+      #endif
+    }
+
+    String macAddress() override {
+      #ifdef NETWORK_HAS_ETHERNET
+      return ETH.macAddress();
+      #else
+      return String();
+      #endif
+    }
 
   protected:
-    static eth_clock_mode_t lan8720ClockMode(EthernetClockMode mode) {
+    #ifdef NETWORK_HAS_ETHERNET
+    // Convert the project-level clock enum to the Arduino-ESP32 ETH API's enum.
+    // Keep this inside NETWORK_HAS_ETHERNET: ETH.h only defines these types and
+    // constants for targets with the ESP32 EMAC enabled.
+    static decltype(ETH_CLOCK_GPIO17_OUT) lan8720ClockMode(EthernetClockMode mode) {
       switch (mode) {
         case EthernetClockMode::GPIO0_IN:   return ETH_CLOCK_GPIO0_IN;
         case EthernetClockMode::GPIO0_OUT:  return ETH_CLOCK_GPIO0_OUT;
@@ -198,6 +236,7 @@ namespace NetworkUtils {
         default:                            return ETH_CLOCK_GPIO17_OUT;
       }
     }
+    #endif
 
     const unsigned long linkCheckInterval = 1000;
     const unsigned long linkGrace = 5000;

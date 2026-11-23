@@ -1,10 +1,4 @@
 #pragma once
-
-// Network uplinks log transitions themselves. Include their logging symbols here so this
-// header also compiles in translation units that do not happen to include main.cpp first.
-#include <TinyLogger.h>
-#include "../../src/strings.h"
-
 #include <NetworkAp.h>
 #include <NetworkConnection.h>
 #include <NetworkEthernet.h>
@@ -27,16 +21,19 @@ namespace NetworkUtils {
 
     NetworkMgr* setYieldCallback(YieldCallback callback = nullptr) {
       this->context.yieldCallback = callback;
+
       return this;
     }
 
     NetworkMgr* setDelayCallback(DelayCallback callback = nullptr) {
       this->context.delayCallback = callback;
+
       return this;
     }
 
     NetworkMgr* setHostname(const char* value) {
       this->context.hostname = value;
+
       return this;
     }
 
@@ -44,6 +41,7 @@ namespace NetworkUtils {
       this->context.apName = ssid;
       this->context.apPassword = password;
       this->context.apChannel = channel;
+
       return this;
     }
 
@@ -51,6 +49,7 @@ namespace NetworkUtils {
       this->context.staSsid = ssid;
       this->context.staPassword = password;
       this->context.staChannel = channel;
+
       return this;
     }
 
@@ -58,20 +57,25 @@ namespace NetworkUtils {
       if (value != this->context.useDhcp) {
         this->ethernet.markSettingsChanged();
       }
+
       this->context.useDhcp = value;
       NetworkConnection::setup(this->context.useDhcp);
+
       return this;
     }
 
     NetworkMgr* setStaticConfig(const char* ip, const char* gateway, const char* subnet, const char* dns) {
       IPAddress valueIp, valueGateway, valueSubnet, valueDns;
+
       valueIp.fromString(ip);
       valueGateway.fromString(gateway);
       valueSubnet.fromString(subnet);
       valueDns.fromString(dns);
 
-      if (valueIp != this->context.staticIp || valueGateway != this->context.staticGateway
-          || valueSubnet != this->context.staticSubnet || valueDns != this->context.staticDns) {
+      if (
+        valueIp != this->context.staticIp || valueGateway != this->context.staticGateway
+        || valueSubnet != this->context.staticSubnet || valueDns != this->context.staticDns
+      ) {
         this->ethernet.markSettingsChanged();
       }
 
@@ -79,12 +83,15 @@ namespace NetworkUtils {
       this->context.staticGateway = valueGateway;
       this->context.staticSubnet = valueSubnet;
       this->context.staticDns = valueDns;
+
       return this;
     }
 
     NetworkMgr* setStaticConfig(IPAddress& ip, IPAddress& gateway, IPAddress& subnet, IPAddress& dns) {
-      if (ip != this->context.staticIp || gateway != this->context.staticGateway
-          || subnet != this->context.staticSubnet || dns != this->context.staticDns) {
+      if (
+        ip != this->context.staticIp || gateway != this->context.staticGateway
+        || subnet != this->context.staticSubnet || dns != this->context.staticDns
+      ) {
         this->ethernet.markSettingsChanged();
       }
 
@@ -92,12 +99,16 @@ namespace NetworkUtils {
       this->context.staticGateway = gateway;
       this->context.staticSubnet = subnet;
       this->context.staticDns = dns;
+
       return this;
     }
 
-    /** Enable or disable whichever Ethernet implementation is selected. */
+    /**
+     * Enable or disable whichever Ethernet implementation is selected.
+     */
     NetworkMgr* setEthernet(bool enabled) {
       this->ethernet.setEnabled(enabled);
+
       return this;
     }
 
@@ -111,21 +122,39 @@ namespace NetworkUtils {
       return this;
     }
 
-    /** Configure W5500 SPI wiring. Has no effect on LAN8720 RMII wiring. */
-    NetworkMgr* setEthernetPins(uint8_t clk, uint8_t mosi, uint8_t miso,
-                                uint8_t cs, uint8_t irq, uint8_t rst) {
+    /**
+     * @brief Configure W5500 wiring. Use GPIO_IS_NOT_CONFIGURED to disable
+     */
+    NetworkMgr* setEthernetPins(uint8_t clk, uint8_t mosi, uint8_t miso, uint8_t cs, uint8_t irq, uint8_t rst) {
       this->ethernet.setPins(clk, mosi, miso, cs, irq, rst);
+
       return this;
     }
 
-    /** Uplinks in the order they are tried: ethernet, WiFi, fallback AP. */
+    /**
+     * @brief Uplinks in the order they are tried: ethernet, WiFi, fallback AP
+     */
     enum class Uplink : uint8_t { None = 0, Ap, Wifi, Ethernet };
 
-    /** The uplink currently carrying traffic. */
+    /**
+     * @brief The uplink that currently carries traffic
+     *
+     * Always the first interface in the hierarchy that can do it, so every consumer reads the
+     * same decision instead of re-testing ethernet and overriding the WiFi answer.
+     */
     Uplink getUplink() {
-      if (this->ethernet.isActive()) return Uplink::Ethernet;
-      if (this->wifi.isActive()) return Uplink::Wifi;
-      if (this->ap.isActive()) return Uplink::Ap;
+      if (this->ethernet.isActive()) {
+        return Uplink::Ethernet;
+      }
+
+      if (this->wifi.isActive()) {
+        return Uplink::Wifi;
+      }
+
+      if (this->ap.isActive()) {
+        return Uplink::Ap;
+      }
+
       return Uplink::None;
     }
 
@@ -133,40 +162,87 @@ namespace NetworkUtils {
       return this->getUplink() >= Uplink::Wifi;
     }
 
+    /**
+     * @brief WiFi signal quality in percent, 0 when WiFi is not carrying the uplink
+     */
     uint8_t getSignalQuality() {
       return this->getUplink() == Uplink::Wifi ? rssiToSignalQuality(this->wifi.rssi()) : 0;
     }
 
+    /**
+     * @return "ethernet", "wifi", "wifi-ap" or "none"
+     */
     const char* getConnectionType() {
       return uplinkName(this->getUplink());
     }
 
+    /**
+     * @brief Uplink token, already in locale-key shape
+     */
     static const char* uplinkName(Uplink uplink) {
       switch (uplink) {
-        case Uplink::Ethernet: return "ethernet";
-        case Uplink::Wifi: return "wifi";
-        case Uplink::Ap: return "wifi-ap";
-        default: return "none";
+        case Uplink::Ethernet:
+          return "ethernet";
+
+        case Uplink::Wifi:
+          return "wifi";
+
+        case Uplink::Ap:
+          return "wifi-ap";
+
+        default:
+          return "none";
       }
     }
 
-    bool isApEnabled() { return this->ap.isEnabled(); }
-    short int getRssi() { return this->station()->rssi(); }
-    IPAddress getApIp() { return this->ap.localIP(); }
-    IPAddress getStaIp() { return this->station()->localIP(); }
-    IPAddress getStaSubnet() { return this->station()->subnetMask(); }
-    IPAddress getStaGateway() { return this->station()->gatewayIP(); }
-    IPAddress getStaDns() { return this->station()->dnsIP(); }
-    String getStaMac() { return this->station()->macAddress(); }
-    const char* getStaSsid() { return this->context.staSsid; }
-    uint8_t getStaChannel() { return this->context.staChannel; }
+    bool isApEnabled() {
+      return this->ap.isEnabled();
+    }
+
+    short int getRssi() {
+      return this->station()->rssi();
+    }
+
+    IPAddress getApIp() {
+      return this->ap.localIP();
+    }
+
+    IPAddress getStaIp() {
+      return this->station()->localIP();
+    }
+
+    IPAddress getStaSubnet() {
+      return this->station()->subnetMask();
+    }
+
+    IPAddress getStaGateway() {
+      return this->station()->gatewayIP();
+    }
+
+    IPAddress getStaDns() {
+      return this->station()->dnsIP();
+    }
+
+    String getStaMac() {
+      return this->station()->macAddress();
+    }
+
+    const char* getStaSsid() {
+      return this->context.staSsid;
+    }
+
+    uint8_t getStaChannel() {
+      return this->context.staChannel;
+    }
 
     void reconnect() {
       this->wifi.reconnect();
     }
 
     void loop() {
+      // The top of the hierarchy polls every pass so it can take the uplink whenever it can
       this->ethernet.loop();
+
       this->trackUplink();
       this->updateWifiRadio();
 
@@ -197,20 +273,35 @@ namespace NetworkUtils {
         : static_cast<NetworkUplink*>(&this->wifi);
     }
 
+    /**
+     * @brief Notice an uplink change so the hierarchy is walked from the top again
+     */
     void trackUplink() {
       const Uplink current = this->getUplink();
-      if (current == this->uplink) return;
 
-      Log.sinfoln(FPSTR(L_NETWORK), F("Uplink: %s -> %s"),
-        uplinkName(this->uplink), uplinkName(current));
+      if (current == this->uplink) {
+        return;
+      }
+
+      Log.sinfoln(FPSTR(L_NETWORK), F("Uplink: %s -> %s"), uplinkName(this->uplink), uplinkName(current));
+
       this->uplink = current;
     }
 
+    /**
+     * @brief Keep the WiFi radio in step with the uplink
+     *
+     * WiFi is only in service while it carries the traffic. The AP is for first configuration:
+     * once a cable carries the uplink the radio goes off, and if that uplink never comes up the
+     * ladder falls back to the AP again on its own.
+     */
     void updateWifiRadio() {
       if (this->ethernet.isActive()) {
         this->wifi.suspend();
+
         return;
       }
+
       this->wifi.resume();
     }
   };

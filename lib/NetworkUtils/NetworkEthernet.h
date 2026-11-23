@@ -35,6 +35,8 @@ namespace NetworkUtils {
 
         bool started = false;
         switch (this->implementation) {
+
+          #if defined(CONFIG_ETH_SPI_ETHERNET_W5500) && CONFIG_ETH_SPI_ETHERNET_W5500
           case EthernetImplementation::W5500:
             Log.sinfoln(
               FPSTR(L_NETWORK),
@@ -48,6 +50,7 @@ namespace NetworkUtils {
             );
             started = ETH.begin(ETH_PHY_W5500, 1, this->cs, this->irq, this->rst, SPI2_HOST, this->clk, this->miso, this->mosi, 12);
             break;
+          #endif  
 
           case EthernetImplementation::LAN8720:
             Log.sinfoln(
@@ -144,8 +147,12 @@ namespace NetworkUtils {
     }
 
     void setImplementation(EthernetImplementation value) {
-      if (value != EthernetImplementation::NONE && value != EthernetImplementation::W5500
-          && value != EthernetImplementation::LAN8720) return;
+      if (value != EthernetImplementation::NONE && value != EthernetImplementation::LAN8720
+    #if defined(CONFIG_ETH_SPI_ETHERNET_W5500) && CONFIG_ETH_SPI_ETHERNET_W5500
+          && value != EthernetImplementation::W5500
+    #endif
+      ) return;
+
       if (value != this->implementation) {
         if (this->started) this->restartFlag = true;
         this->implementation = value;
@@ -176,12 +183,16 @@ namespace NetworkUtils {
         case EthernetImplementation::LAN8720:
           return true;
         case EthernetImplementation::W5500:
+        #if defined(CONFIG_ETH_SPI_ETHERNET_W5500) && CONFIG_ETH_SPI_ETHERNET_W5500
           return this->clk != GPIO_IS_NOT_CONFIGURED
             && this->mosi != GPIO_IS_NOT_CONFIGURED
             && this->miso != GPIO_IS_NOT_CONFIGURED
             && this->cs != GPIO_IS_NOT_CONFIGURED
             && this->irq != GPIO_IS_NOT_CONFIGURED
             && this->rst != GPIO_IS_NOT_CONFIGURED;
+        #else
+          return false;
+        #endif
         case EthernetImplementation::NONE:
         default:
           return false;

@@ -36,22 +36,30 @@ namespace NetworkUtils {
         bool started = false;
         switch (this->implementation) {
           case EthernetImplementation::W5500:
-            Log.sinfoln(FPSTR(L_NETWORK),
+            Log.sinfoln(
+              FPSTR(L_NETWORK),
               F("Ethernet: init W5500 (CS: %u, IRQ: %u, RST: %u, CLK: %u, MISO: %u, MOSI: %u)"),
-              this->cs, this->irq, this->rst, this->clk, this->miso, this->mosi);
-            started = ETH.begin(ETH_PHY_W5500, 1, this->cs, this->irq, this->rst,
-              SPI2_HOST, this->clk, this->miso, this->mosi, 12);
+              this->cs,
+              this->irq,
+              this->rst,
+              this->clk,
+              this->miso,
+              this->mosi
+            );
+            started = ETH.begin(ETH_PHY_W5500, 1, this->cs, this->irq, this->rst, SPI2_HOST, this->clk, this->miso, this->mosi, 12);
             break;
 
           case EthernetImplementation::LAN8720:
-            Log.sinfoln(FPSTR(L_NETWORK),
+            Log.sinfoln(
+              FPSTR(L_NETWORK),
               F("Ethernet: init LAN8720 (PHY: %u, MDC: %u, MDIO: %u, power: %d)"),
-              DEFAULT_LAN8720_PHY_ADDR, DEFAULT_LAN8720_MDC_GPIO,
-              DEFAULT_LAN8720_MDIO_GPIO, DEFAULT_LAN8720_POWER_GPIO);
-            started = ETH.begin(ETH_PHY_LAN8720,
-              DEFAULT_LAN8720_PHY_ADDR, DEFAULT_LAN8720_MDC_GPIO,
-              DEFAULT_LAN8720_MDIO_GPIO, DEFAULT_LAN8720_POWER_GPIO,
-              lan8720ClockMode(DEFAULT_LAN8720_CLK_MODE));
+              DEFAULT_LAN8720_PHY_ADDR,
+              DEFAULT_LAN8720_MDC_GPIO,
+              DEFAULT_LAN8720_MDIO_GPIO,
+              DEFAULT_LAN8720_POWER_GPIO
+            );
+            started = ETH.begin(ETH_PHY_LAN8720, DEFAULT_LAN8720_PHY_ADDR, DEFAULT_LAN8720_MDC_GPIO, DEFAULT_LAN8720_MDIO_GPIO, DEFAULT_LAN8720_POWER_GPIO,
+              static_cast<eth_clock_mode_t>(DEFAULT_LAN8720_CLK_MODE));
             break;
 
           case EthernetImplementation::NONE:
@@ -182,23 +190,47 @@ namespace NetworkUtils {
 
     EthernetImplementation getImplementation() const { return this->implementation; }
 
-    IPAddress localIP() override { #ifdef NETWORK_HAS_ETHERNET return ETH.localIP(); #else return IPAddress(); #endif }
-    IPAddress subnetMask() override { #ifdef NETWORK_HAS_ETHERNET return ETH.subnetMask(); #else return IPAddress(); #endif }
-    IPAddress gatewayIP() override { #ifdef NETWORK_HAS_ETHERNET return ETH.gatewayIP(); #else return IPAddress(); #endif }
-    IPAddress dnsIP() override { #ifdef NETWORK_HAS_ETHERNET return ETH.dnsIP(); #else return IPAddress(); #endif }
-    String macAddress() override { #ifdef NETWORK_HAS_ETHERNET return ETH.macAddress(); #else return String(); #endif }
-
-  protected:
-    static eth_clock_mode_t lan8720ClockMode(EthernetClockMode mode) {
-      switch (mode) {
-        case EthernetClockMode::GPIO0_IN:   return ETH_CLOCK_GPIO0_IN;
-        case EthernetClockMode::GPIO0_OUT:  return ETH_CLOCK_GPIO0_OUT;
-        case EthernetClockMode::GPIO16_OUT: return ETH_CLOCK_GPIO16_OUT;
-        case EthernetClockMode::GPIO17_OUT:
-        default:                            return ETH_CLOCK_GPIO17_OUT;
-      }
+    IPAddress localIP() override {
+      #ifdef NETWORK_HAS_ETHERNET
+      return ETH.localIP();
+      #else
+      return IPAddress();
+      #endif
     }
 
+    IPAddress subnetMask() override {
+      #ifdef NETWORK_HAS_ETHERNET
+      return ETH.subnetMask();
+      #else
+      return IPAddress();
+      #endif
+    }
+
+    IPAddress gatewayIP() override {
+      #ifdef NETWORK_HAS_ETHERNET
+      return ETH.gatewayIP();
+      #else
+      return IPAddress();
+      #endif
+    }
+
+    IPAddress dnsIP() override {
+      #ifdef NETWORK_HAS_ETHERNET
+      return ETH.dnsIP();
+      #else
+      return IPAddress();
+      #endif
+    }
+
+    String macAddress() override {
+      #ifdef NETWORK_HAS_ETHERNET
+      return ETH.macAddress();
+      #else
+      return String();
+      #endif
+    }
+
+  protected:
     const unsigned long linkCheckInterval = 1000;
     const unsigned long linkGrace = 5000;
     const unsigned long leaseGrace = 20000;

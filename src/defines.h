@@ -262,10 +262,10 @@ enum class EthernetImplementation : uint8_t {
 };
 
 enum class EthernetClockMode : uint8_t {
-    GPIO0_IN,
-    GPIO0_OUT,
-    GPIO16_OUT,
-    GPIO17_OUT
+  GPIO0_IN   = 0,
+  GPIO0_OUT  = 1,
+  GPIO16_OUT = 2,
+  GPIO17_OUT = 3
 };
 
 char buffer[255];

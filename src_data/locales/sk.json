@@ -152,6 +152,7 @@
 
       "section": {
         "static": "Statické nastavenia",
+        "ethernet": "Ethernet",
         "availableNetworks": "Dostupné siete",
         "staSettings": "WiFi nastavenia",
         "apSettings": "AP nastavenia"
@@ -160,6 +161,19 @@
       "scan": {
         "pos": "#",
         "info": "Info"
+        "unavailable": "Na vyhľadávanie sietí povoľte WiFi."
+      },
+
+      "ethernet": {
+        "enable": "Povoliť ethernet",
+		"notConfigured": "Na povolenie ethernetu vyplňte všetkých šesť GPIO pinov.",
+        "clk": "SPI clock GPIO",
+        "mosi": "SPI MOSI GPIO",
+        "miso": "SPI MISO GPIO",
+        "cs": "SPI CS GPIO",
+        "irq": "Interrupt GPIO",
+        "rst": "Reset GPIO",
+        "note": "W5500 SPI zapojenie"
       },
 
       "wifi": {
@@ -178,6 +192,12 @@
         "subnet": "Maska siete",
         "gateway": "Brána",
         "dns": "DNS"
+        "connection": "Spojenie",
+        "connectionType": {
+          "ethernet": "Ethernet",
+          "wifi": "WiFi",
+          "wifi-ap": "WiFi AP",
+          "none": "Žiadné"
       },
 
       "sta": {

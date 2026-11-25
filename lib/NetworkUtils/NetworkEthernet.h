@@ -34,35 +34,36 @@ namespace NetworkUtils {
         if (this->startUnavailable) return;
 
         bool started = false;
-        switch (this->implementation) {
+        switch (networkSettings.ethernet.implementation) {
 
           #if defined(CONFIG_ETH_SPI_ETHERNET_W5500) && CONFIG_ETH_SPI_ETHERNET_W5500
           case EthernetImplementation::W5500:
+            const auto& w5500 = networkSettings.ethernet.W5500;
             Log.sinfoln(
               FPSTR(L_NETWORK),
               F("Ethernet: init W5500 (CS: %u, IRQ: %u, RST: %u, CLK: %u, MISO: %u, MOSI: %u)"),
-              this->cs,
-              this->irq,
-              this->rst,
-              this->clk,
-              this->miso,
-              this->mosi
+              w5500.cs,
+              w5500.irq,
+              w5500.rst,
+              w5500.clk,
+              w5500.miso,
+              w5500.mosi
             );
-            started = ETH.begin(ETH_PHY_W5500, 1, this->cs, this->irq, this->rst, SPI2_HOST, this->clk, this->miso, this->mosi, 12);
+            started = ETH.begin(ETH_PHY_W5500, 1, w5500.cs, w5500.irq, w5500.rst, SPI2_HOST, w5500.clk, w5500.miso, w5500.mosi, 12);
             break;
           #endif  
 
           case EthernetImplementation::LAN8720:
+            const auto& lan8720 = networkSettings.ethernet.lan8720;
             Log.sinfoln(
               FPSTR(L_NETWORK),
               F("Ethernet: init LAN8720 (PHY: %u, MDC: %u, MDIO: %u, power: %d)"),
-              DEFAULT_LAN8720_PHY_ADDR,
-              DEFAULT_LAN8720_MDC_GPIO,
-              DEFAULT_LAN8720_MDIO_GPIO,
-              DEFAULT_LAN8720_POWER_GPIO
+              lan8720.phy,
+              lan8720.mdc,
+              lan8720.mdio,
+              lan8720.power
             );
-            started = ETH.begin(ETH_PHY_LAN8720, DEFAULT_LAN8720_PHY_ADDR, DEFAULT_LAN8720_MDC_GPIO, DEFAULT_LAN8720_MDIO_GPIO, DEFAULT_LAN8720_POWER_GPIO,
-              static_cast<eth_clock_mode_t>(DEFAULT_LAN8720_CLK_MODE));
+            started = ETH.begin(ETH_PHY_LAN8720, lan8720.phy, lan8720.mdc, lan8720.mdio, lan8720.power, static_cast<eth_clock_mode_t>(lan8720.clk));
             break;
 
           case EthernetImplementation::NONE:
@@ -153,43 +154,66 @@ namespace NetworkUtils {
     #endif
       ) return;
 
-      if (value != this->implementation) {
+      if (value != networkSettings.ethernet.implementation) {
         if (this->started) this->restartFlag = true;
-        this->implementation = value;
+        networkSettings.ethernet.implementation = value;
         this->startUnavailable = false;
       }
     }
 
-    void setPins(uint8_t clk, uint8_t mosi, uint8_t miso,
-                 uint8_t cs, uint8_t irq, uint8_t rst) {
-      if (clk != this->clk || mosi != this->mosi || miso != this->miso
-          || cs != this->cs || irq != this->irq || rst != this->rst) {
+    void setPinsW5500(uint8_t clk, uint8_t mosi, uint8_t miso, uint8_t cs, uint8_t irq, uint8_t rst) {
+      auto& w5500 = networkSettings.ethernet.w5500;
+
+      if (clk != w5500.clk || mosi != w5500.mosi || miso != w5500.miso || cs != w5500.cs || irq != w5500.irq || rst != w5500.rst) {
         this->markSettingsChanged();
       }
-      this->clk = clk;
-      this->mosi = mosi;
-      this->miso = miso;
-      this->cs = cs;
-      this->irq = irq;
-      this->rst = rst;
+      w5500.clk = clk;
+      w5500.mosi = mosi;
+      w5500.miso = miso;
+      w5500.cs = cs;
+      w5500.irq = irq;
+      w5500.rst = rst;
     }
+
+    void setPinsLAN8720(uint8_t mdc, uint8_t mdio, uint8_t phy, uint8_t power, EthernetClockMode clockMode) {
+      auto& lan8720 = networkSettings.ethernet.lan8720;
+
+      if (mdc != lan8720.mdc || mdio != lan8720.mdio || phy != lan8720.phy || power != lan8720.power || clockMode != lan8720.clk) {
+        this->markSettingsChanged();
+      }
+      lan8720.mdc = mdc;
+      lan8720.mdio = mdio;
+      lan8720.phy = phy;
+      lan8720.power = power;
+      lan8720.clk = clockMode;
+    }    
 
     void markSettingsChanged() {
       if (this->started) this->restartFlag = true;
     }
 
     bool hasPins() const {
-      switch (this->implementation) {
-        case EthernetImplementation::LAN8720:
-          return true;
+      switch (networkSettings.ethernet.implementation)
+        {
+        case EthernetImplementation::LAN8720: {
+          const auto& lan8720 = networkSettings.ethernet.lan8720;
+          return lan8720.mdc != GPIO_IS_NOT_CONFIGURED
+            && lan8720.mdio != GPIO_IS_NOT_CONFIGURED
+            && lan8720.power != GPIO_IS_NOT_CONFIGURED
+            && lan8720.phy != PARM_IS_NOT_CONFIGURED
+            && static_cast<uint8_t>(lan8720.clk) != PARM_IS_NOT_CONFIGURED;
+        }
         case EthernetImplementation::W5500:
         #if defined(CONFIG_ETH_SPI_ETHERNET_W5500) && CONFIG_ETH_SPI_ETHERNET_W5500
-          return this->clk != GPIO_IS_NOT_CONFIGURED
-            && this->mosi != GPIO_IS_NOT_CONFIGURED
-            && this->miso != GPIO_IS_NOT_CONFIGURED
-            && this->cs != GPIO_IS_NOT_CONFIGURED
-            && this->irq != GPIO_IS_NOT_CONFIGURED
-            && this->rst != GPIO_IS_NOT_CONFIGURED;
+        {
+          const auto& w5500 = networkSettings.ethernet.w5500;
+          return w5500.clk != GPIO_IS_NOT_CONFIGURED
+            && w5500.mosi != GPIO_IS_NOT_CONFIGURED
+            && w5500.miso != GPIO_IS_NOT_CONFIGURED
+            && w5500.cs != GPIO_IS_NOT_CONFIGURED
+            && w5500.irq != GPIO_IS_NOT_CONFIGURED
+            && w5500.rst != GPIO_IS_NOT_CONFIGURED;
+        }
         #else
           return false;
         #endif
@@ -199,7 +223,7 @@ namespace NetworkUtils {
       }
     }
 
-    EthernetImplementation getImplementation() const { return this->implementation; }
+    EthernetImplementation getImplementation() const { return networkSettings.ethernet.implementation; }
 
     IPAddress localIP() override {
       #ifdef NETWORK_HAS_ETHERNET
@@ -253,15 +277,6 @@ namespace NetworkUtils {
     bool linkUp = false;
     bool restartFlag = false;
     bool startUnavailable = false;
-
-    EthernetImplementation implementation = DEFAULT_ETHERNET_IMPLEMENTATION;
-
-    uint8_t clk = GPIO_IS_NOT_CONFIGURED;
-    uint8_t mosi = GPIO_IS_NOT_CONFIGURED;
-    uint8_t miso = GPIO_IS_NOT_CONFIGURED;
-    uint8_t cs = GPIO_IS_NOT_CONFIGURED;
-    uint8_t irq = GPIO_IS_NOT_CONFIGURED;
-    uint8_t rst = GPIO_IS_NOT_CONFIGURED;
 
     unsigned long prevLinkCheck = 0;
   };

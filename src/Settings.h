@@ -34,8 +34,8 @@ struct NetworkSettings {
   struct {
     bool enabled = DEFAULT_ETHERNET_ENABLED;
 
-    // nothing reads this yet: the W5500 is the only implementation the firmware can drive
-    EthernetImplementation implementation = EthernetImplementation::W5500;
+//    EthernetImplementation implementation = EthernetImplementation::W5500;
+    EthernetImplementation implementation = EthernetImplementation::LAN8720;
 
     struct {
       uint8_t clk = DEFAULT_ETH_CLK_GPIO;
@@ -45,6 +45,14 @@ struct NetworkSettings {
       uint8_t irq = DEFAULT_ETH_IRQ_GPIO;
       uint8_t rst = DEFAULT_ETH_RST_GPIO;
     } w5500;
+
+    struct {
+      uint8_t phy = DEFAULT_LAN8720_PHY_ADDR;
+      uint8_t mdc = DEFAULT_LAN8720_MDC_GPIO;
+      uint8_t mdio = DEFAULT_LAN8720_MDIO_GPIO;
+      uint8_t power = DEFAULT_LAN8720_POWER_GPIO;
+      EthernetClockMode clk = EthernetClockMode::GPIO17_OUT;
+    } lan8720;
   } ethernet;
 } networkSettings;
 

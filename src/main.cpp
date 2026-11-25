@@ -173,16 +173,24 @@ void setup() {
       break;
   }
 
-  // ethernet (W5500) is configured from the network settings, after they are loaded
+  // Ethernet is configured from the network settings, after they are loaded.
   network
     ->setEthernet(networkSettings.ethernet.enabled)
-    ->setEthernetPins(
+    ->setEthernetImplementation(networkSettings.ethernet.implementation)
+    ->setEthernetW5500(
       networkSettings.ethernet.w5500.clk,
       networkSettings.ethernet.w5500.mosi,
       networkSettings.ethernet.w5500.miso,
       networkSettings.ethernet.w5500.cs,
       networkSettings.ethernet.w5500.irq,
       networkSettings.ethernet.w5500.rst
+    )
+    ->setEthernetLAN8720(
+      networkSettings.ethernet.lan8720.mdc,
+      networkSettings.ethernet.lan8720.mdio,
+      networkSettings.ethernet.lan8720.phy,
+      networkSettings.ethernet.lan8720.power,
+      networkSettings.ethernet.lan8720.clk
     );
 
   // generate mqtt prefix if it is empty

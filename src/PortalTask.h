@@ -386,7 +386,7 @@ protected:
 
       bool changed = jsonToNetworkSettings(doc, networkSettings);
 
-      // ethernet is only usable with a complete W5500 pin set
+      // ethernet is only usable with a complete pin set
       if (!this->isEthernetConfigured() && networkSettings.ethernet.enabled) {
         networkSettings.ethernet.enabled = false;
         changed = true;
@@ -1052,10 +1052,8 @@ protected:
   }
 
   /**
-   * @brief Add the computed W5500 state to a network settings document
-   * @details The key is absent entirely on builds without ethernet, rather than an empty object:
-   * presence of the section is what tells a client the target can do it. The stored fields
-   * (enabled flag, pinout) come from networkSettingsToJson, this adds only what is derived.
+   * @brief Add the computed Ethernet state to a network settings document
+   * @details The key is absent entirely on builds without ethernet.
    */
   void ethernetToJson(JsonDocument& dst) {
     #if USE_ETHERNET
@@ -1064,36 +1062,64 @@ protected:
   }
 
   /**
-   * @brief Ethernet can only be used when all six W5500 pins are configured
+   * @brief Check whether the selected Ethernet implementation is configured
    */
   bool isEthernetConfigured() {
     #if USE_ETHERNET
-    return networkSettings.ethernet.w5500.clk != GPIO_IS_NOT_CONFIGURED
-      && networkSettings.ethernet.w5500.mosi != GPIO_IS_NOT_CONFIGURED
-      && networkSettings.ethernet.w5500.miso != GPIO_IS_NOT_CONFIGURED
-      && networkSettings.ethernet.w5500.cs != GPIO_IS_NOT_CONFIGURED
-      && networkSettings.ethernet.w5500.irq != GPIO_IS_NOT_CONFIGURED
-      && networkSettings.ethernet.w5500.rst != GPIO_IS_NOT_CONFIGURED;
+    switch (networkSettings.ethernet.implementation) {
+      case EthernetImplementation::W5500:
+        #if defined(CONFIG_ETH_SPI_ETHERNET_W5500) && CONFIG_ETH_SPI_ETHERNET_W5500
+        return networkSettings.ethernet.w5500.clk != GPIO_IS_NOT_CONFIGURED
+          && networkSettings.ethernet.w5500.mosi != GPIO_IS_NOT_CONFIGURED
+          && networkSettings.ethernet.w5500.miso != GPIO_IS_NOT_CONFIGURED
+          && networkSettings.ethernet.w5500.cs != GPIO_IS_NOT_CONFIGURED
+          && networkSettings.ethernet.w5500.irq != GPIO_IS_NOT_CONFIGURED
+          && networkSettings.ethernet.w5500.rst != GPIO_IS_NOT_CONFIGURED;
+        #else
+        return false;
+        #endif
+
+      case EthernetImplementation::LAN8720: {
+        const auto& lan8720 = networkSettings.ethernet.lan8720;
+
+        return lan8720.mdc != GPIO_IS_NOT_CONFIGURED
+          && lan8720.mdio != GPIO_IS_NOT_CONFIGURED
+          && lan8720.power != GPIO_IS_NOT_CONFIGURED
+          && lan8720.phy != PARM_IS_NOT_CONFIGURED
+          && static_cast<uint8_t>(lan8720.clk) != PARM_IS_NOT_CONFIGURED;
+      }
+
+      case EthernetImplementation::NONE:
+      default:
+        return false;
+    }
     #else
-    // nothing to configure: the W5500 driver is not compiled into this target
     return false;
     #endif
   }
 
   /**
-   * @brief Push the W5500 wiring from the settings into the network manager
+   * @brief Push Ethernet settings into the network manager
    */
   void applyEthernetSettings() {
     #if USE_ETHERNET
     network
       ->setEthernet(networkSettings.ethernet.enabled)
-      ->setEthernetPins(
+      ->setEthernetImplementation(networkSettings.ethernet.implementation)
+      ->setEthernetW5500(
         networkSettings.ethernet.w5500.clk,
         networkSettings.ethernet.w5500.mosi,
         networkSettings.ethernet.w5500.miso,
         networkSettings.ethernet.w5500.cs,
         networkSettings.ethernet.w5500.irq,
         networkSettings.ethernet.w5500.rst
+      )
+      ->setEthernetLAN8720(
+        networkSettings.ethernet.lan8720.mdc,
+        networkSettings.ethernet.lan8720.mdio,
+        networkSettings.ethernet.lan8720.phy,
+        networkSettings.ethernet.lan8720.power,
+        networkSettings.ethernet.lan8720.clk
       );
     #endif
   }

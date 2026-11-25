@@ -125,8 +125,17 @@ namespace NetworkUtils {
     /**
      * @brief Configure W5500 wiring. Use GPIO_IS_NOT_CONFIGURED to disable
      */
-    NetworkMgr* setEthernetPins(uint8_t clk, uint8_t mosi, uint8_t miso, uint8_t cs, uint8_t irq, uint8_t rst) {
-      this->ethernet.setPins(clk, mosi, miso, cs, irq, rst);
+    NetworkMgr* setEthernetW5500(uint8_t clk, uint8_t mosi, uint8_t miso, uint8_t cs, uint8_t irq, uint8_t rst) {
+      this->ethernet.setPinsW5500(clk, mosi, miso, cs, irq, rst);
+
+      return this;
+    }
+
+    /**
+     * Configure LAN8720 wiring. Use GPIO_IS_NOT_CONFIGURED and PARM_IS_NOT_CONFIGURED to disable
+     */
+    NetworkMgr* setEthernetLAN8720(uint8_t mdc, uint8_t mdio, uint8_t phy, uint8_t power, EthernetClockMode clk) {
+      this->ethernet.setPinsLAN8720(mdc, mdio, phy, power, clk);
 
       return this;
     }

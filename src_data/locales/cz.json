@@ -166,15 +166,23 @@
 
       "ethernet": {
         "enable": "Povolit ethernet",
-        "notConfigured": "Pro povolení ethernetu zadej všech šest pinů.",
+        "notConfigured": "Pro povolení ethernetu zadejte všechny hodnoty.",
         "clk": "SPI clock GPIO",
         "mosi": "SPI MOSI GPIO",
         "miso": "SPI MISO GPIO",
         "cs": "SPI CS GPIO",
         "irq": "Interrupt GPIO",
         "rst": "Reset GPIO",
-        "note": "W5500 SPI zapojení"
-      },
+        "note": "Nastavení pro Ethernet.",
+        "mdc": "MDC GPIO",
+        "mdio": "MDIO GPIO",
+        "power": "POWER GPIO",
+        "phy": "PHY adresa",
+        "clkmode": "Clock mode",
+        "ethtype": "Typ Ethernetu",
+        "w5500_head": "W5500 SPI piny",
+        "lan8720_head": "LAN8720 RMII nastavení"
+     },
 
       "wifi": {
         "ssid": "SSID",

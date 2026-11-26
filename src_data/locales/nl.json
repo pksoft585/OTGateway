@@ -166,14 +166,22 @@
 
       "ethernet": {
         "enable": "Ethernet inschakelen",
-        "notConfigured": "Vul alle zes GPIO-pinnen in om ethernet in te schakelen.",
+        "notConfigured": "Voer alle waarden in om Ethernet in te schakelen.",
         "clk": "SPI-klok GPIO",
         "mosi": "SPI MOSI GPIO",
         "miso": "SPI MISO GPIO",
         "cs": "SPI CS GPIO",
         "irq": "Interrupt GPIO",
         "rst": "Reset GPIO",
-        "note": "W5500 SPI-bedrading"
+        "note": "Ethernet-instellingen.",
+        "mdc": "MDC GPIO",
+        "mdio": "MDIO GPIO",
+        "power": "POWER GPIO",
+        "phy": "PHY-ADRES",
+        "clkmode": "Klokmodus",
+        "ethtype": "Type Ethernet",
+        "w5500_head": "W5500 SPI-pinnen",
+        "lan8720_head": "LAN8720 RMII-instellingen"
       },
 
       "wifi": {

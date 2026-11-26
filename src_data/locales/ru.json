@@ -166,14 +166,22 @@
 
       "ethernet": {
         "enable": "Включить ethernet",
-        "notConfigured": "Заполните все шесть выводов GPIO, чтобы включить ethernet.",
+        "notConfigured": "Введите все значения, чтобы включить Ethernet.",
         "clk": "GPIO тактирования SPI",
         "mosi": "GPIO MOSI SPI",
         "miso": "GPIO MISO SPI",
         "cs": "GPIO CS SPI",
         "irq": "GPIO прерывания",
         "rst": "GPIO сброса",
-        "note": "Подключение W5500 по SPI"
+        "note": "Настройки Ethernet.",
+        "mdc": "MDC GPIO",
+        "mdio": "MDIO GPIO",
+        "power": "POWER GPIO",
+        "phy": "АДРЕС PHY",
+        "clkmode": "Режим тактирования",
+        "ethtype": "Тип Ethernet",
+        "w5500_head": "Пины SPI W5500",
+        "lan8720_head": "Настройки RMII LAN8720"
       },
 
       "wifi": {

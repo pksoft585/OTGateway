@@ -166,14 +166,22 @@
 
       "ethernet": {
         "enable": "Abilita ethernet",
-        "notConfigured": "Compilare tutti e sei i pin GPIO per abilitare ethernet.",
+        "notConfigured": "Inserisci tutti i valori per abilitare Ethernet.",
         "clk": "GPIO clock SPI",
         "mosi": "GPIO MOSI SPI",
         "miso": "GPIO MISO SPI",
         "cs": "GPIO CS SPI",
         "irq": "GPIO interrupt",
         "rst": "GPIO reset",
-        "note": "Cablaggio SPI del W5500"
+        "note": "Impostazioni Ethernet..",
+        "mdc": "MDC GPIO",
+        "mdio": "MDIO GPIO",
+        "power": "POWER GPIO",
+        "phy": "INDIRIZZO PHY",
+        "clkmode": "Modalità clock",
+        "ethtype": "Tipo di Ethernet",
+        "w5500_head": "Pin SPI W5500",
+        "lan8720_head": "Impostazioni RMII LAN8720"
       },
 
       "wifi": {

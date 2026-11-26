@@ -229,8 +229,8 @@ enum class HysteresisAction : uint8_t {
 };
 
 enum class EthernetImplementation : uint8_t {
-  NONE  = 0,
-  W5500 = 1,
+  NONE    = 0,
+  W5500   = 1,
   LAN8720 = 2
 };
 
@@ -238,7 +238,8 @@ enum class EthernetClockMode : uint8_t {
   GPIO0_IN   = 0,
   GPIO0_OUT  = 1,
   GPIO16_OUT = 2,
-  GPIO17_OUT = 3
+  GPIO17_OUT = 3,
+  NOT_CONFIGURED = PARM_IS_NOT_CONFIGURED
 };
 
 char buffer[255];

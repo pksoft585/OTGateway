@@ -166,14 +166,22 @@
 
       "ethernet": {
         "enable": "启用以太网",
-        "notConfigured": "填写全部六个 GPIO 引脚后才能启用以太网。",
+        "notConfigured": "输入所有值以启用以太网。",
         "clk": "SPI 时钟 GPIO",
         "mosi": "SPI MOSI GPIO",
         "miso": "SPI MISO GPIO",
         "cs": "SPI CS GPIO",
         "irq": "中断 GPIO",
         "rst": "复位 GPIO",
-        "note": "W5500 SPI 接线"
+        "note": "以太网设置。",
+        "mdc": "MDC GPIO",
+        "mdio": "MDIO GPIO",
+        "power": "电源 GPIO",
+        "phy": "PHY 地址",
+        "clkmode": "时钟模式",
+        "ethtype": "以太网类型",
+        "w5500_head": "W5500 SPI 引脚",
+        "lan8720_head": "LAN8720 RMII 设置"
       },
 
       "wifi": {

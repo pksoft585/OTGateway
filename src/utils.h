@@ -302,13 +302,25 @@ void networkSettingsToJson(const NetworkSettings& src, JsonVariant dst) {
 
   ethernet[FPSTR(S_ENABLED)] = src.ethernet.enabled;
 
-  auto pins = ethernet[FPSTR(S_PINS)].to<JsonObject>();
-  pins[FPSTR(S_CLK)] = src.ethernet.w5500.clk;
-  pins[FPSTR(S_MOSI)] = src.ethernet.w5500.mosi;
-  pins[FPSTR(S_MISO)] = src.ethernet.w5500.miso;
-  pins[FPSTR(S_CS)] = src.ethernet.w5500.cs;
-  pins[FPSTR(S_IRQ)] = src.ethernet.w5500.irq;
-  pins[FPSTR(S_RST)] = src.ethernet.w5500.rst;
+  ethernet["implementation"] = static_cast<uint8_t>(src.ethernet.implementation);
+
+  auto w5500 = ethernet["w5500"].to<JsonObject>();
+  w5500[FPSTR(S_CLK)] = src.ethernet.w5500.clk;
+  w5500[FPSTR(S_MOSI)] = src.ethernet.w5500.mosi;
+  w5500[FPSTR(S_MISO)] = src.ethernet.w5500.miso;
+  w5500[FPSTR(S_CS)] = src.ethernet.w5500.cs;
+  w5500[FPSTR(S_IRQ)] = src.ethernet.w5500.irq;
+  w5500[FPSTR(S_RST)] = src.ethernet.w5500.rst;
+
+  // Keep the old flat shape readable by existing clients/backups.
+  ethernet["pins"] = w5500;
+
+  auto lan8720 = ethernet["lan8720"].to<JsonObject>();
+  lan8720[FPSTR(S_MDC)] = src.ethernet.lan8720.mdc;
+  lan8720[FPSTR(S_MDIO)] = src.ethernet.lan8720.mdio;
+  lan8720[FPSTR(S_PHY)] = src.ethernet.lan8720.phy;
+  lan8720[FPSTR(S_LAN8720_POWER)] = src.ethernet.lan8720.power;
+  lan8720[FPSTR(S_CLK)] = static_cast<uint8_t>(src.ethernet.lan8720.clk);
   #endif
 }
 
@@ -644,7 +656,7 @@ bool jsonToGpioValue(const JsonVariantConst src, const __FlashStringHelper* key,
 
 /**
  * @brief Parse the W5500 pinout from an object holding clk/mosi/miso/cs/irq/rst
- *
+ * Parse the LAN8720 pinout from an object holding mdc/mdio/phy/power/clk & Ethernet implementation type
  * @return true if the source object exists
  */
 bool jsonToEthernetPins(const JsonVariantConst src, NetworkSettings& dst, bool& changed) {
@@ -652,12 +664,68 @@ bool jsonToEthernetPins(const JsonVariantConst src, NetworkSettings& dst, bool& 
     return false;
   }
 
-  jsonToGpioValue(src, FPSTR(S_CLK), dst.ethernet.w5500.clk, changed);
-  jsonToGpioValue(src, FPSTR(S_MOSI), dst.ethernet.w5500.mosi, changed);
-  jsonToGpioValue(src, FPSTR(S_MISO), dst.ethernet.w5500.miso, changed);
-  jsonToGpioValue(src, FPSTR(S_CS), dst.ethernet.w5500.cs, changed);
-  jsonToGpioValue(src, FPSTR(S_IRQ), dst.ethernet.w5500.irq, changed);
-  jsonToGpioValue(src, FPSTR(S_RST), dst.ethernet.w5500.rst, changed);
+  if (!src["implementation"].isNull()) {
+    uint8_t implementation = src["implementation"].as<uint8_t>();
+
+    switch (implementation) {
+      case static_cast<uint8_t>(EthernetImplementation::NONE):
+      case static_cast<uint8_t>(EthernetImplementation::W5500):
+      case static_cast<uint8_t>(EthernetImplementation::LAN8720):
+        if (static_cast<uint8_t>(dst.ethernet.implementation) != implementation) {
+          dst.ethernet.implementation =
+            static_cast<EthernetImplementation>(implementation);
+          changed = true;
+        }
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  JsonVariantConst w5500 = src["w5500"];
+  if (w5500.isNull()) {
+    w5500 = src[FPSTR(S_PINS)];
+  }
+
+  if (!w5500.isNull()) {
+    jsonToGpioValue(w5500, FPSTR(S_CLK), dst.ethernet.w5500.clk, changed);
+    jsonToGpioValue(w5500, FPSTR(S_MOSI), dst.ethernet.w5500.mosi, changed);
+    jsonToGpioValue(w5500, FPSTR(S_MISO), dst.ethernet.w5500.miso, changed);
+    jsonToGpioValue(w5500, FPSTR(S_CS), dst.ethernet.w5500.cs, changed);
+    jsonToGpioValue(w5500, FPSTR(S_IRQ), dst.ethernet.w5500.irq, changed);
+    jsonToGpioValue(w5500, FPSTR(S_RST), dst.ethernet.w5500.rst, changed);
+  }
+
+  JsonVariantConst lan8720 = src["lan8720"];
+  if (!lan8720.isNull()) {
+    jsonToGpioValue(lan8720, FPSTR(S_MDC), dst.ethernet.lan8720.mdc, changed);
+    jsonToGpioValue(lan8720, FPSTR(S_MDIO), dst.ethernet.lan8720.mdio, changed);
+    jsonToGpioValue(lan8720, FPSTR(S_LAN8720_POWER), dst.ethernet.lan8720.power, changed);
+
+    if (!lan8720["phy"].isNull()) {
+      uint8_t phy = lan8720[FPSTR(S_PHY)].as<uint8_t>();
+
+      if (phy <= 31 && phy != dst.ethernet.lan8720.phy) {
+        dst.ethernet.lan8720.phy = phy;
+        changed = true;
+      }
+    }
+
+    if (!lan8720[FPSTR(S_CLK)].isNull()) {
+      uint8_t clk = lan8720[FPSTR(S_CLK)].as<uint8_t>();
+
+      if (clk <= 3) {
+        EthernetClockMode clockMode =
+          static_cast<EthernetClockMode>(clk);
+
+        if (dst.ethernet.lan8720.clk != clockMode) {
+          dst.ethernet.lan8720.clk = clockMode;
+          changed = true;
+        }
+      }
+    }
+  }
 
   return true;
 }

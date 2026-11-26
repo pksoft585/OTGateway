@@ -302,14 +302,14 @@ protected:
             networkSettings.staticConfig.gateway,
             networkSettings.staticConfig.subnet,
             networkSettings.staticConfig.dns
-          )
-          ->setEthernet(networkSettings.ethernet.enabled);
+          );
+
+        this->applyEthernetSettings();
         changed = true;
       }
 
       if (!doc[FPSTR(S_SETTINGS)].isNull() && jsonToSettings(doc[FPSTR(S_SETTINGS)], settings)) {
         fsSettings.update();
-        applyEthernetSettings();
         changed = true;
       }
 
@@ -415,11 +415,10 @@ protected:
             networkSettings.staticConfig.gateway,
             networkSettings.staticConfig.subnet,
             networkSettings.staticConfig.dns
-          )
-          ->setEthernet(networkSettings.ethernet.enabled)
-          ->reconnect();
+          );
 
         this->applyEthernetSettings();
+        network->reconnect();
       }
     });
 
@@ -1104,7 +1103,6 @@ protected:
   void applyEthernetSettings() {
     #if USE_ETHERNET
     network
-      ->setEthernet(networkSettings.ethernet.enabled)
       ->setEthernetImplementation(networkSettings.ethernet.implementation)
       ->setEthernetW5500(
         networkSettings.ethernet.w5500.clk,
@@ -1120,7 +1118,8 @@ protected:
         networkSettings.ethernet.lan8720.phy,
         networkSettings.ethernet.lan8720.power,
         networkSettings.ethernet.lan8720.clk
-      );
+      )
+      ->setEthernet(networkSettings.ethernet.enabled);
     #endif
   }
 

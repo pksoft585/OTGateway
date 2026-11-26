@@ -52,6 +52,7 @@
               <input type="checkbox" name="useDhcp" value="true">
               <span data-i18n>network.params.dhcp</span>
             </label>
+
             <br />
             <hr />
             <h4 data-i18n>network.section.static</h4>
@@ -170,7 +171,7 @@
       <article id="ethernet-section" class="hidden">
         <div>
           <hgroup>
-            <h3 data-i18n>network.section.ethernet</h3>
+            <h2 data-i18n>network.section.ethernet</h2>
             <p></p>
           </hgroup>
 
@@ -179,45 +180,94 @@
             <label>
               <input type="checkbox" name="ethernet[enabled]" value="true">
               <span data-i18n>network.ethernet.enable</span>
+              <p></p>
+            </label>
+
+            <label>
+              <span data-i18n>network.ethernet.ethtype</span>
+              <select name="ethernet[implementation]" id="ethernet-implementation">
+                <option value="0">---</option>
+                <option value="1">W5500</option>
+                <option value="2">LAN8720</option>
+              </select>
             </label>
             <small id="ethernet-not-configured" class="hidden" data-i18n>network.ethernet.notConfigured</small>
 
-            <div class="grid">
-              <label>
-                <span data-i18n>network.ethernet.clk</span>
-                <input type="number" inputmode="numeric" name="ethernet[pins][clk]" min="0" max="254" step="1">
-              </label>
+            <fieldset id="ethernet-w5500-fields">
+              <legend data-i18n>network.ethernet.w5500_head</legend>
+              <div class="grid">
+                <label>
+                  <span data-i18n>network.ethernet.clk</span>
+                  <input type="number" inputmode="numeric" name="ethernet[w5500][clk]" min="0" max="254" step="1">
+                </label>
 
-              <label>
-                <span data-i18n>network.ethernet.mosi</span>
-                <input type="number" inputmode="numeric" name="ethernet[pins][mosi]" min="0" max="254" step="1">
-              </label>
+                <label>
+                  <span data-i18n>network.ethernet.mosi</span>
+                  <input type="number" inputmode="numeric" name="ethernet[w5500][mosi]" min="0" max="254" step="1">
+                </label>
 
-              <label>
-                <span data-i18n>network.ethernet.miso</span>
-                <input type="number" inputmode="numeric" name="ethernet[pins][miso]" min="0" max="254" step="1">
-              </label>
-            </div>
+                <label>
+                  <span data-i18n>network.ethernet.miso</span>
+                  <input type="number" inputmode="numeric" name="ethernet[w5500][miso]" min="0" max="254" step="1">
+                </label>
+              </div>
 
-            <div class="grid">
-              <label>
-                <span data-i18n>network.ethernet.cs</span>
-                <input type="number" inputmode="numeric" name="ethernet[pins][cs]" min="0" max="254" step="1">
-              </label>
+              <div class="grid">
+                <label>
+                  <span data-i18n>network.ethernet.cs</span>
+                  <input type="number" inputmode="numeric" name="ethernet[w5500][cs]" min="0" max="254" step="1">
+                </label>
 
-              <label>
-                <span data-i18n>network.ethernet.irq</span>
-                <input type="number" inputmode="numeric" name="ethernet[pins][irq]" min="0" max="254" step="1">
-              </label>
+                <label>
+                  <span data-i18n>network.ethernet.irq</span>
+                  <input type="number" inputmode="numeric" name="ethernet[w5500][irq]" min="0" max="254" step="1">
+                </label>
 
-              <label>
-                <span data-i18n>network.ethernet.rst</span>
-                <input type="number" inputmode="numeric" name="ethernet[pins][rst]" min="0" max="254" step="1">
-              </label>
-            </div>
+                <label>
+                  <span data-i18n>network.ethernet.rst</span>
+                  <input type="number" inputmode="numeric" name="ethernet[w5500][rst]" min="0" max="254" step="1">
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset id="ethernet-lan8720-fields">
+              <legend data-i18n>network.ethernet.lan8720_head</legend>
+              <div class="grid">
+                <label>
+                  <span data-i18n>network.ethernet.mdc</span>
+                  <input type="number" inputmode="numeric" name="ethernet[lan8720][mdc]" min="0" max="254" step="1">
+                </label>
+
+                <label>
+                  <span data-i18n>network.ethernet.mdio</span>
+                  <input type="number" inputmode="numeric" name="ethernet[lan8720][mdio]" min="0" max="254" step="1">
+                </label>
+
+                <label>
+                  <span data-i18n>network.ethernet.power</span>
+                  <input type="number" inputmode="numeric" name="ethernet[lan8720][power]" min="0" max="254" step="1">
+                </label>
+              </div>
+
+              <div class="grid">
+                <label>
+                  <span data-i18n>network.ethernet.phy</span>
+                  <input type="number" inputmode="numeric" name="ethernet[lan8720][phy]" min="0" max="31" step="1">
+                </label>
+
+                <label>
+                  <span data-i18n>network.ethernet.clkmode</span>
+                  <select name="ethernet[lan8720][clk]">
+                    <option value="0">GPIO0 input</option>
+                    <option value="1">GPIO0 output</option>
+                    <option value="2">GPIO16 output</option>
+                    <option value="3">GPIO17 output</option>
+                  </select>
+                </label>
+              </div>
+            </fieldset>
 
             <small data-i18n>network.ethernet.note</small>
-
             <button type="submit" data-i18n>button.save</button>
           </form>
         </div>
@@ -241,6 +291,56 @@
         const lang = new Lang(document.getElementById('lang'));
         await lang.build();
 
+        const updateEthernetFields = () => {
+          const implementation = document.getElementById('ethernet-implementation')?.value;
+          const w5500Fields = document.getElementById('ethernet-w5500-fields');
+          const lan8720Fields = document.getElementById('ethernet-lan8720-fields');
+
+          const setGroup = (group, visible) => {
+            group?.classList.toggle('hidden', !visible);
+            group?.querySelectorAll('input, select').forEach((input) => {
+              input.disabled = !visible;
+            });
+          };
+
+          setGroup(w5500Fields, implementation === '1');
+          setGroup(lan8720Fields, implementation === '2');
+
+          const values = (names) => names.map((name) =>
+            document.querySelector(`[name="${name}"]`)?.value
+          );
+
+          const configured = implementation === '1'
+            ? values([
+                'ethernet[w5500][clk]',
+                'ethernet[w5500][mosi]',
+                'ethernet[w5500][miso]',
+                'ethernet[w5500][cs]',
+                'ethernet[w5500][irq]',
+                'ethernet[w5500][rst]'
+              ]).every((value) => value !== '')
+            : implementation === '2'
+              ? values([
+                  'ethernet[lan8720][mdc]',
+                  'ethernet[lan8720][mdio]',
+                  'ethernet[lan8720][phy]',
+                  'ethernet[lan8720][power]',
+                  'ethernet[lan8720][clk]'
+                ]).every((value) => value !== '')
+              : false;
+
+          const checkbox = document.querySelector("[name='ethernet[enabled]']");
+          if (checkbox) {
+            checkbox.disabled = implementation === '0' || !configured;
+            if (implementation === '0') {
+              checkbox.checked = false;
+            }
+          }
+
+          document.getElementById('ethernet-not-configured')
+            ?.classList.toggle('hidden', configured || implementation === '0');
+        };
+
         const fillData = (data) => {
           setInputValue("[name='hostname']", data.hostname);
           setCheckboxValue("[name='useDhcp']", data.useDhcp);
@@ -251,26 +351,37 @@
           setBusy('#network-settings-busy', '#network-settings', false);
 
           const ethernet = data.ethernet || {};
-          const ethernetConfigured = !!ethernet.configured;
-          const ethernetPins = ethernet.pins || {};
+          const w5500 = ethernet.w5500 || ethernet.pins || {};
+          const lan8720 = ethernet.lan8720 || {};
           const pinValue = (value) => (value ?? 255) < 255 ? value : '';
 
-          setInputValue("[name='ethernet[pins][clk]']", pinValue(ethernetPins.clk));
-          setInputValue("[name='ethernet[pins][mosi]']", pinValue(ethernetPins.mosi));
-          setInputValue("[name='ethernet[pins][miso]']", pinValue(ethernetPins.miso));
-          setInputValue("[name='ethernet[pins][cs]']", pinValue(ethernetPins.cs));
-          setInputValue("[name='ethernet[pins][irq]']", pinValue(ethernetPins.irq));
-          setInputValue("[name='ethernet[pins][rst]']", pinValue(ethernetPins.rst));
+          setInputValue(
+            "[name='ethernet[implementation]']",
+            String(ethernet.implementation ?? 0)
+          );
 
-          setCheckboxValue("[name='ethernet[enabled]']", ethernetConfigured ? !!ethernet.enabled : false);
+          setInputValue("[name='ethernet[w5500][clk]']", pinValue(w5500.clk));
+          setInputValue("[name='ethernet[w5500][mosi]']", pinValue(w5500.mosi));
+          setInputValue("[name='ethernet[w5500][miso]']", pinValue(w5500.miso));
+          setInputValue("[name='ethernet[w5500][cs]']", pinValue(w5500.cs));
+          setInputValue("[name='ethernet[w5500][irq]']", pinValue(w5500.irq));
+          setInputValue("[name='ethernet[w5500][rst]']", pinValue(w5500.rst));
 
-          const ethernetCheckbox = document.querySelector("[name='ethernet[enabled]']");
-          if (ethernetCheckbox) {
-            ethernetCheckbox.disabled = !ethernetConfigured;
-          }
+          setInputValue("[name='ethernet[lan8720][mdc]']", pinValue(lan8720.mdc));
+          setInputValue("[name='ethernet[lan8720][mdio]']", pinValue(lan8720.mdio));
+          setInputValue("[name='ethernet[lan8720][phy]']", pinValue(lan8720.phy));
+          setInputValue("[name='ethernet[lan8720][power]']", pinValue(lan8720.power));
+          setInputValue(
+            "[name='ethernet[lan8720][clk]']",
+            String(lan8720.clk ?? 3)
+          );
 
-          document.getElementById('ethernet-not-configured')?.classList.toggle('hidden', ethernetConfigured);
+          setCheckboxValue(
+            "[name='ethernet[enabled]']",
+            !!ethernet.enabled && ethernet.implementation !== 0
+          );
 
+          updateEthernetFields();
           setBusy('#ethernet-settings-busy', '#ethernet-settings', false);
 
           setInputValue("[name='sta[ssid]']", data.sta.ssid);
@@ -285,13 +396,16 @@
         };
 
         const applyCapabilities = (info) => {
-          // pages and firmware ship together: the section stays hidden unless the build says it can do ethernet
           const supported = info?.features?.ethernet === true;
-
-          document.getElementById('ethernet-section')?.classList.toggle('hidden', !supported);
-
+          document.getElementById('ethernet-section')
+            ?.classList.toggle('hidden', !supported);
           return supported;
         };
+
+        document.getElementById('ethernet-implementation')
+          ?.addEventListener('change', updateEthernetFields);
+        document.getElementById('ethernet-settings')
+          ?.addEventListener('input', updateEthernetFields);
 
         try {
           const [response, infoResponse] = await Promise.all([

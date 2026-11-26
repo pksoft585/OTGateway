@@ -113,19 +113,26 @@ namespace NetworkUtils {
     }
 
     /**
-     * @brief Select the Ethernet PHY/driver (NONE, W5500, or LAN8720).
-     * LAN8720 RMII pin configuration comes from DEFAULT_LAN8720_* board macros;
-     * W5500 SPI wiring is configured separately with setEthernetPins().
+     * Select the Ethernet implementation. Configure its pins separately using
+     * setEthernetW5500() or setEthernetLAN8720().
      */
     NetworkMgr* setEthernetImplementation(EthernetImplementation implementation) {
       this->ethernet.setImplementation(implementation);
+
       return this;
     }
 
     /**
      * @brief Configure W5500 wiring. Use GPIO_IS_NOT_CONFIGURED to disable
      */
-    NetworkMgr* setEthernetW5500(uint8_t clk, uint8_t mosi, uint8_t miso, uint8_t cs, uint8_t irq, uint8_t rst) {
+    NetworkMgr* setEthernetW5500(
+      uint8_t clk,
+      uint8_t mosi,
+      uint8_t miso,
+      uint8_t cs,
+      uint8_t irq,
+      uint8_t rst
+    ) {
       this->ethernet.setPinsW5500(clk, mosi, miso, cs, irq, rst);
 
       return this;
@@ -134,7 +141,13 @@ namespace NetworkUtils {
     /**
      * Configure LAN8720 wiring. Use GPIO_IS_NOT_CONFIGURED and PARM_IS_NOT_CONFIGURED to disable
      */
-    NetworkMgr* setEthernetLAN8720(uint8_t mdc, uint8_t mdio, uint8_t phy, uint8_t power, EthernetClockMode clk) {
+    NetworkMgr* setEthernetLAN8720(
+      uint8_t mdc,
+      uint8_t mdio,
+      uint8_t phy,
+      uint8_t power,
+      EthernetClockMode clk
+    ) {
       this->ethernet.setPinsLAN8720(mdc, mdio, phy, power, clk);
 
       return this;

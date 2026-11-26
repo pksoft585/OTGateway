@@ -319,7 +319,7 @@ void networkSettingsToJson(const NetworkSettings& src, JsonVariant dst) {
   lan8720[FPSTR(S_MDC)] = src.ethernet.lan8720.mdc;
   lan8720[FPSTR(S_MDIO)] = src.ethernet.lan8720.mdio;
   lan8720[FPSTR(S_PHY)] = src.ethernet.lan8720.phy;
-  lan8720[FPSTR(S_LAN8720_POWER)] = src.ethernet.lan8720.power;
+  lan8720[FPSTR(S_POWER)] = src.ethernet.lan8720.power;
   lan8720[FPSTR(S_CLK)] = static_cast<uint8_t>(src.ethernet.lan8720.clk);
   #endif
 }
@@ -452,7 +452,7 @@ bool jsonToNetworkSettings(const JsonVariantConst src, NetworkSettings& dst) {
     }
   }
 
-  jsonToEthernetPins(src[FPSTR(S_ETHERNET)][FPSTR(S_PINS)], dst, changed);
+  jsonToEthernetPins(src[FPSTR(S_ETHERNET)], dst, changed);
 
   return changed;
 }
@@ -701,7 +701,7 @@ bool jsonToEthernetPins(const JsonVariantConst src, NetworkSettings& dst, bool& 
   if (!lan8720.isNull()) {
     jsonToGpioValue(lan8720, FPSTR(S_MDC), dst.ethernet.lan8720.mdc, changed);
     jsonToGpioValue(lan8720, FPSTR(S_MDIO), dst.ethernet.lan8720.mdio, changed);
-    jsonToGpioValue(lan8720, FPSTR(S_LAN8720_POWER), dst.ethernet.lan8720.power, changed);
+    jsonToGpioValue(lan8720, FPSTR(S_POWER), dst.ethernet.lan8720.power, changed);
 
     if (!lan8720["phy"].isNull()) {
       uint8_t phy = lan8720[FPSTR(S_PHY)].as<uint8_t>();

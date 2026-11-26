@@ -137,7 +137,6 @@ const char S_I_MULTIPLIER[]                         PROGMEM = "i_multiplier";
 const char S_LOGIN[]                                PROGMEM = "login";
 const char S_LOG_LEVEL[]                            PROGMEM = "logLevel";
 const char S_LOW_TEMP[]                             PROGMEM = "lowTemp";
-const char S_LAN8720_POWER[]                        PROGMEM = "lan8720power";
 const char S_MAC[]                                  PROGMEM = "mac";
 const char S_MASTER[]                               PROGMEM = "master";
 const char S_MAX[]                                  PROGMEM = "max";

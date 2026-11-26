@@ -51,7 +51,7 @@ struct NetworkSettings {
       uint8_t mdc = DEFAULT_LAN8720_MDC_GPIO;
       uint8_t mdio = DEFAULT_LAN8720_MDIO_GPIO;
       uint8_t power = DEFAULT_LAN8720_POWER_GPIO;
-      EthernetClockMode clk = EthernetClockMode::GPIO17_OUT;
+      EthernetClockMode clk = static_cast<EthernetClockMode>(PARM_IS_NOT_CONFIGURED);
     } lan8720;
   } ethernet;
 } networkSettings;

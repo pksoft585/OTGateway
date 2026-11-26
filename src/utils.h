@@ -302,9 +302,9 @@ void networkSettingsToJson(const NetworkSettings& src, JsonVariant dst) {
 
   ethernet[FPSTR(S_ENABLED)] = src.ethernet.enabled;
 
-  ethernet["implementation"] = static_cast<uint8_t>(src.ethernet.implementation);
+  ethernet[FPSTR(S_IMPLEMENTATION)] = static_cast<uint8_t>(src.ethernet.implementation);
 
-  auto w5500 = ethernet["w5500"].to<JsonObject>();
+  auto w5500 = ethernet[FPSTR(S_W5500)].to<JsonObject>();
   w5500[FPSTR(S_CLK)] = src.ethernet.w5500.clk;
   w5500[FPSTR(S_MOSI)] = src.ethernet.w5500.mosi;
   w5500[FPSTR(S_MISO)] = src.ethernet.w5500.miso;
@@ -312,10 +312,7 @@ void networkSettingsToJson(const NetworkSettings& src, JsonVariant dst) {
   w5500[FPSTR(S_IRQ)] = src.ethernet.w5500.irq;
   w5500[FPSTR(S_RST)] = src.ethernet.w5500.rst;
 
-  // Keep the old flat shape readable by existing clients/backups.
-  ethernet["pins"] = w5500;
-
-  auto lan8720 = ethernet["lan8720"].to<JsonObject>();
+  auto lan8720 = ethernet[FPSTR(S_LAN8720)].to<JsonObject>();
   lan8720[FPSTR(S_MDC)] = src.ethernet.lan8720.mdc;
   lan8720[FPSTR(S_MDIO)] = src.ethernet.lan8720.mdio;
   lan8720[FPSTR(S_PHY)] = src.ethernet.lan8720.phy;
@@ -656,7 +653,7 @@ bool jsonToGpioValue(const JsonVariantConst src, const __FlashStringHelper* key,
 
 /**
  * @brief Parse the W5500 pinout from an object holding clk/mosi/miso/cs/irq/rst
- * Parse the LAN8720 pinout from an object holding mdc/mdio/phy/power/clk & Ethernet implementation type
+ *        Parse the LAN8720 pinout from an object holding mdc/mdio/phy/power/clk & Ethernet implementation type
  * @return true if the source object exists
  */
 bool jsonToEthernetPins(const JsonVariantConst src, NetworkSettings& dst, bool& changed) {
@@ -664,8 +661,8 @@ bool jsonToEthernetPins(const JsonVariantConst src, NetworkSettings& dst, bool& 
     return false;
   }
 
-  if (!src["implementation"].isNull()) {
-    uint8_t implementation = src["implementation"].as<uint8_t>();
+  if (!src[FPSTR(S_IMPLEMENTATION)].isNull()) {
+    uint8_t implementation = src[FPSTR(S_IMPLEMENTATION)].as<uint8_t>();
 
     switch (implementation) {
       case static_cast<uint8_t>(EthernetImplementation::NONE):
@@ -683,7 +680,7 @@ bool jsonToEthernetPins(const JsonVariantConst src, NetworkSettings& dst, bool& 
     }
   }
 
-  JsonVariantConst w5500 = src["w5500"];
+  JsonVariantConst w5500 = src[FPSTR(S_W5500)];
   if (w5500.isNull()) {
     w5500 = src[FPSTR(S_PINS)];
   }
@@ -697,13 +694,13 @@ bool jsonToEthernetPins(const JsonVariantConst src, NetworkSettings& dst, bool& 
     jsonToGpioValue(w5500, FPSTR(S_RST), dst.ethernet.w5500.rst, changed);
   }
 
-  JsonVariantConst lan8720 = src["lan8720"];
+  JsonVariantConst lan8720 = src[FPSTR(S_LAN8720)];
   if (!lan8720.isNull()) {
     jsonToGpioValue(lan8720, FPSTR(S_MDC), dst.ethernet.lan8720.mdc, changed);
     jsonToGpioValue(lan8720, FPSTR(S_MDIO), dst.ethernet.lan8720.mdio, changed);
     jsonToGpioValue(lan8720, FPSTR(S_POWER), dst.ethernet.lan8720.power, changed);
 
-    if (!lan8720["phy"].isNull()) {
+    if (!lan8720[FPSTR(S_PHY)].isNull()) {
       uint8_t phy = lan8720[FPSTR(S_PHY)].as<uint8_t>();
 
       if (phy <= 31 && phy != dst.ethernet.lan8720.phy) {

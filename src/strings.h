@@ -124,6 +124,7 @@ const char S_ID[]                                   PROGMEM = "id";
 const char S_IGNORE_DIAG_STATE[]                    PROGMEM = "ignoreDiagState";
 const char S_IMMERGAS_FIX[]                         PROGMEM = "immergasFix";
 const char S_ALWAYS_SEND_INDOOR_TEMP[]              PROGMEM = "alwaysSendIndoorTemp";
+const char S_IMPLEMENTATION[]                       PROGMEM = "implementation";
 const char S_INDOOR_TEMP[]                          PROGMEM = "indoorTemp";
 const char S_INDOOR_TEMP_CONTROL[]                  PROGMEM = "indoorTempControl";
 const char S_IN_GPIO[]                              PROGMEM = "inGpio";
@@ -134,6 +135,7 @@ const char S_IP[]                                   PROGMEM = "ip";
 const char S_IRQ[]                                  PROGMEM = "irq";
 const char S_I_FACTOR[]                             PROGMEM = "i_factor";
 const char S_I_MULTIPLIER[]                         PROGMEM = "i_multiplier";
+const char S_LAN8720[]                              PROGMEM = "lan8720";
 const char S_LOGIN[]                                PROGMEM = "login";
 const char S_LOG_LEVEL[]                            PROGMEM = "logLevel";
 const char S_LOW_TEMP[]                             PROGMEM = "lowTemp";
@@ -241,6 +243,7 @@ const char S_USE_DHCP[]                             PROGMEM = "useDhcp";
 const char S_USER[]                                 PROGMEM = "user";
 const char S_VALUE[]                                PROGMEM = "value";
 const char S_VERSION[]                              PROGMEM = "version";
+const char S_W5500[]                                PROGMEM = "w5500";
 
 #if defined(DISPLAY_ENABLED)
 const char S_DISPLAY[]                              PROGMEM = "display";
